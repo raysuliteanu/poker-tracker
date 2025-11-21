@@ -5,8 +5,8 @@ mod schema;
 mod utils;
 
 use actix_cors::Cors;
-use actix_web::{web, App, HttpServer};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use actix_web::{App, HttpServer, web};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenv::dotenv;
 use std::env;
 

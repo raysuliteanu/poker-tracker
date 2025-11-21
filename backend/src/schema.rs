@@ -30,7 +30,4 @@ diesel::table! {
 
 diesel::joinable!(poker_sessions -> users (user_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    poker_sessions,
-    users,
-);
+diesel::allow_tables_to_appear_in_same_query!(poker_sessions, users,);

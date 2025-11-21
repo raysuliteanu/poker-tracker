@@ -1,5 +1,5 @@
-use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
-use bcrypt::{hash, verify, DEFAULT_COST};
+use actix_web::{HttpMessage, HttpRequest, HttpResponse, Responder, web};
+use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::Utc;
 use diesel::prelude::*;
 use uuid::Uuid;
@@ -10,12 +10,9 @@ use crate::models::{
     UpdateCookieConsent, User,
 };
 use crate::schema::users;
-use crate::utils::{create_jwt, DbPool};
+use crate::utils::{DbPool, create_jwt};
 
-pub async fn register(
-    pool: web::Data<DbPool>,
-    req: web::Json<RegisterRequest>,
-) -> impl Responder {
+pub async fn register(pool: web::Data<DbPool>, req: web::Json<RegisterRequest>) -> impl Responder {
     if let Err(errors) = req.validate() {
         return HttpResponse::BadRequest().json(serde_json::json!({
             "error": "Validation failed",
@@ -28,7 +25,7 @@ pub async fn register(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to hash password"
-            }))
+            }));
         }
     };
 
@@ -43,7 +40,7 @@ pub async fn register(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -71,7 +68,7 @@ pub async fn register(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create account. Please try again."
-            }))
+            }));
         }
     };
 
@@ -80,7 +77,7 @@ pub async fn register(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Token generation failed"
-            }))
+            }));
         }
     };
 
@@ -100,7 +97,7 @@ pub async fn login(pool: web::Data<DbPool>, req: web::Json<LoginRequest>) -> imp
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -112,7 +109,7 @@ pub async fn login(pool: web::Data<DbPool>, req: web::Json<LoginRequest>) -> imp
         Err(_) => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Invalid credentials"
-            }))
+            }));
         }
     };
 
@@ -127,7 +124,7 @@ pub async fn login(pool: web::Data<DbPool>, req: web::Json<LoginRequest>) -> imp
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Token generation failed"
-            }))
+            }));
         }
     };
 
@@ -140,7 +137,7 @@ pub async fn get_me(pool: web::Data<DbPool>, req: HttpRequest) -> impl Responder
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -149,7 +146,7 @@ pub async fn get_me(pool: web::Data<DbPool>, req: HttpRequest) -> impl Responder
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -171,7 +168,7 @@ pub async fn update_cookie_consent(
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -180,7 +177,7 @@ pub async fn update_cookie_consent(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -222,7 +219,7 @@ pub async fn change_password(
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -231,7 +228,7 @@ pub async fn change_password(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -240,7 +237,7 @@ pub async fn change_password(
         Err(_) => {
             return HttpResponse::NotFound().json(serde_json::json!({
                 "error": "User not found"
-            }))
+            }));
         }
     };
 
@@ -255,7 +252,7 @@ pub async fn change_password(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to hash password"
-            }))
+            }));
         }
     };
 

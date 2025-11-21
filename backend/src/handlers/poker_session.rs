@@ -1,4 +1,4 @@
-use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpMessage, HttpRequest, HttpResponse, Responder, web};
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{NaiveDate, Utc};
 use diesel::prelude::*;
@@ -29,7 +29,7 @@ pub async fn create_session(
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -38,7 +38,7 @@ pub async fn create_session(
         Err(_) => {
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "Invalid date format. Expected YYYY-MM-DD"
-            }))
+            }));
         }
     };
 
@@ -57,7 +57,7 @@ pub async fn create_session(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -78,7 +78,7 @@ pub async fn get_sessions(pool: web::Data<DbPool>, req: HttpRequest) -> impl Res
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -87,7 +87,7 @@ pub async fn get_sessions(pool: web::Data<DbPool>, req: HttpRequest) -> impl Res
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -105,10 +105,7 @@ pub async fn get_sessions(pool: web::Data<DbPool>, req: HttpRequest) -> impl Res
                         .to_string()
                         .parse::<f64>()
                         .unwrap_or(0.0);
-                    SessionWithProfit {
-                        session: s,
-                        profit,
-                    }
+                    SessionWithProfit { session: s, profit }
                 })
                 .collect();
             HttpResponse::Ok().json(sessions_with_profit)
@@ -129,7 +126,7 @@ pub async fn get_session(
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -138,7 +135,7 @@ pub async fn get_session(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -153,10 +150,7 @@ pub async fn get_session(
                 .to_string()
                 .parse::<f64>()
                 .unwrap_or(0.0);
-            HttpResponse::Ok().json(SessionWithProfit {
-                session,
-                profit,
-            })
+            HttpResponse::Ok().json(SessionWithProfit { session, profit })
         }
         Err(_) => HttpResponse::NotFound().json(serde_json::json!({
             "error": "Session not found"
@@ -175,7 +169,7 @@ pub async fn update_session(
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -184,7 +178,7 @@ pub async fn update_session(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 
@@ -198,7 +192,7 @@ pub async fn update_session(
         Err(_) => {
             return HttpResponse::NotFound().json(serde_json::json!({
                 "error": "Session not found"
-            }))
+            }));
         }
     };
 
@@ -208,7 +202,7 @@ pub async fn update_session(
             Err(_) => {
                 return HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "Invalid date format. Expected YYYY-MM-DD"
-                }))
+                }));
             }
         }
     } else {
@@ -265,7 +259,7 @@ pub async fn delete_session(
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "Unauthorized"
-            }))
+            }));
         }
     };
 
@@ -274,7 +268,7 @@ pub async fn delete_session(
         Err(_) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database connection failed"
-            }))
+            }));
         }
     };
 

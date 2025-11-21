@@ -3,6 +3,7 @@ use diesel::r2d2::{self, ConnectionManager, Pool, PooledConnection};
 use std::env;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
+#[allow(dead_code)]
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 pub fn establish_connection_pool() -> DbPool {

@@ -1,10 +1,10 @@
 use actix_web::{
-    body::EitherBody,
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage, HttpResponse,
+    body::EitherBody,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
 };
 use futures::future::LocalBoxFuture;
-use std::future::{ready, Ready};
+use std::future::{Ready, ready};
 use uuid::Uuid;
 
 use crate::utils::jwt::decode_jwt;
@@ -49,28 +49,18 @@ where
             .headers()
             .get("Authorization")
             .and_then(|h| h.to_str().ok())
-            .and_then(|h| {
-                if h.starts_with("Bearer ") {
-                    Some(h[7..].to_string())
-                } else {
-                    None
-                }
-            });
+            .and_then(|h| h.strip_prefix("Bearer "));
 
-        if let Some(token) = auth_header {
-            match decode_jwt(&token) {
-                Ok(claims) => {
-                    if let Ok(user_id) = Uuid::parse_str(&claims.sub) {
-                        req.extensions_mut().insert(user_id);
-                        let fut = self.service.call(req);
-                        return Box::pin(async move {
-                            let res = fut.await?;
-                            Ok(res.map_into_left_body())
-                        });
-                    }
-                }
-                Err(_) => {}
-            }
+        if let Some(token) = auth_header
+            && let Ok(claims) = decode_jwt(token)
+            && let Ok(user_id) = Uuid::parse_str(&claims.sub)
+        {
+            req.extensions_mut().insert(user_id);
+            let fut = self.service.call(req);
+            return Box::pin(async move {
+                let res = fut.await?;
+                Ok(res.map_into_left_body())
+            });
         }
 
         Box::pin(async move {

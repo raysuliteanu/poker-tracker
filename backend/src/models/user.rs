@@ -24,7 +24,11 @@ pub struct User {
 pub struct NewUser {
     #[validate(email(message = "Invalid email address"))]
     pub email: String,
-    #[validate(length(min = 3, max = 100, message = "Username must be between 3 and 100 characters"))]
+    #[validate(length(
+        min = 3,
+        max = 100,
+        message = "Username must be between 3 and 100 characters"
+    ))]
     pub username: String,
     pub password_hash: String,
 }
@@ -33,7 +37,11 @@ pub struct NewUser {
 pub struct RegisterRequest {
     #[validate(email(message = "Invalid email address"))]
     pub email: String,
-    #[validate(length(min = 3, max = 100, message = "Username must be between 3 and 100 characters"))]
+    #[validate(length(
+        min = 3,
+        max = 100,
+        message = "Username must be between 3 and 100 characters"
+    ))]
     pub username: String,
     #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
     pub password: String,
@@ -65,6 +73,7 @@ pub struct ChangePasswordRequest {
 }
 
 #[derive(Debug, Deserialize, Validate)]
+#[expect(dead_code)]
 pub struct ResetPasswordRequest {
     #[validate(email(message = "Invalid email address"))]
     pub email: String,
