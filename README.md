@@ -1,10 +1,12 @@
 # Poker Bankroll Tracker
 
-A full-stack web application for tracking poker bankroll and session history with detailed analytics and visualizations.
+A full-stack web application for tracking poker bankroll and session history
+with detailed analytics and visualizations.
 
 ## Features
 
 ### User Management
+
 - User registration and authentication
 - Secure password management (bcrypt hashing)
 - JWT-based authentication
@@ -12,6 +14,7 @@ A full-stack web application for tracking poker bankroll and session history wit
 - Cookie consent management (GDPR/CCPA compliant)
 
 ### Session Tracking
+
 - Record poker sessions with:
   - Date
   - Duration
@@ -23,12 +26,14 @@ A full-stack web application for tracking poker bankroll and session history wit
 - View all sessions in a sortable table
 
 ### Analytics & Visualization
+
 - Total profit/loss calculation
 - Session statistics (total sessions, hours played, hourly rate)
 - Interactive bankroll chart
 - Time-based filtering (week, month, quarter, year, all-time)
 
 ### User Experience
+
 - Light and dark mode themes
 - Responsive design for mobile and desktop
 - Cookie consent banner
@@ -37,6 +42,7 @@ A full-stack web application for tracking poker bankroll and session history wit
 ## Tech Stack
 
 ### Backend
+
 - **Language**: Rust
 - **Framework**: Actix-web
 - **Database**: PostgreSQL
@@ -45,6 +51,7 @@ A full-stack web application for tracking poker bankroll and session history wit
 - **Migrations**: diesel_migrations
 
 ### Frontend
+
 - **Framework**: Svelte 5
 - **Build Tool**: Vite
 - **Language**: TypeScript
@@ -123,13 +130,15 @@ docker-compose down
 ```
 
 Services will be available at:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8080
+
+- Frontend: <http://localhost:8888>
+- Backend API: <http://localhost:8080>
 - PostgreSQL: localhost:5432
 
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login user
 - `GET /api/auth/me` - Get current user (requires auth)
@@ -137,6 +146,7 @@ Services will be available at:
 - `POST /api/auth/change-password` - Change password (requires auth)
 
 ### Poker Sessions
+
 - `POST /api/sessions` - Create new session (requires auth)
 - `GET /api/sessions` - Get all user sessions (requires auth)
 - `GET /api/sessions/{id}` - Get specific session (requires auth)
@@ -146,6 +156,7 @@ Services will be available at:
 ## Environment Variables
 
 ### Backend (.env)
+
 ```
 DATABASE_URL=postgres://postgres:password@localhost/poker_tracker
 JWT_SECRET=your-secret-key-change-this-in-production
@@ -155,6 +166,7 @@ PORT=8080
 ```
 
 ### Frontend (.env)
+
 ```
 VITE_API_URL=http://localhost:8080/api
 ```
@@ -162,6 +174,7 @@ VITE_API_URL=http://localhost:8080/api
 ## Database Schema
 
 ### Users Table
+
 - `id` (UUID, primary key)
 - `email` (VARCHAR, unique)
 - `username` (VARCHAR, unique)
@@ -172,6 +185,7 @@ VITE_API_URL=http://localhost:8080/api
 - `updated_at` (TIMESTAMP)
 
 ### Poker Sessions Table
+
 - `id` (UUID, primary key)
 - `user_id` (UUID, foreign key to users)
 - `session_date` (DATE)
@@ -214,6 +228,7 @@ docker-compose -f docker-compose.yml up -d --build
 ## Development Commands
 
 ### Backend
+
 ```bash
 # Run tests
 cargo test
@@ -229,6 +244,7 @@ diesel migration generate <migration_name>
 ```
 
 ### Frontend
+
 ```bash
 # Run development server
 npm run dev
