@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, web};
+use actix_web::{App, HttpResponse, HttpServer, web};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use std::env;
 use std::io::Result;
@@ -7,6 +7,10 @@ use std::io::Result;
 use handlers::{auth, poker_session};
 use middleware::AuthMiddleware;
 use utils::establish_connection_pool;
+
+async fn health() -> HttpResponse {
+    HttpResponse::Ok().body("ok")
+}
 
 use crate::handlers;
 use crate::middleware;
@@ -47,6 +51,7 @@ impl PokerTrackerApp {
                 .app_data(web::Data::new(pool.clone()))
                 .service(
                     web::scope("/api")
+                        .route("/health", web::get().to(health))
                         .service(
                             web::scope("/auth")
                                 .route("/register", web::post().to(auth::register))
