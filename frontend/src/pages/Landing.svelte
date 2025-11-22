@@ -112,17 +112,13 @@
     margin-bottom: 1.5rem;
   }
 
-  .btn-primary,
-  .btn-secondary {
+  .btn-primary {
     padding: 0.875rem 2rem;
     font-size: 1rem;
     font-weight: 600;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
-  }
-
-  .btn-primary {
     background-color: var(--color-primary);
     color: white;
     border: none;
@@ -130,17 +126,6 @@
 
   .btn-primary:hover {
     background-color: var(--color-primary-dark);
-  }
-
-  .btn-secondary {
-    background-color: transparent;
-    color: var(--color-primary);
-    border: 2px solid var(--color-primary);
-  }
-
-  .btn-secondary:hover {
-    background-color: var(--color-primary);
-    color: white;
   }
 
   .login-hint {
@@ -171,8 +156,7 @@
       flex-direction: column;
     }
 
-    .btn-primary,
-    .btn-secondary {
+    .btn-primary {
       width: 100%;
     }
   }

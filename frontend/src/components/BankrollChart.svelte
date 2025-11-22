@@ -108,7 +108,7 @@
           },
           tooltip: {
             callbacks: {
-              label: (context) => `Profit/Loss: $${context.parsed.y.toFixed(2)}`,
+              label: (context) => `Profit/Loss: $${context.parsed.y?.toFixed(2) ?? '0.00'}`,
             },
           },
         },
@@ -175,7 +175,7 @@
         No sessions found for the selected time range.
       </div>
     {:else}
-      <canvas bind:this={canvas} />
+      <canvas bind:this={canvas}></canvas>
     {/if}
   </div>
 </div>

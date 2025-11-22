@@ -64,8 +64,10 @@
   }
 </script>
 
+<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="modal-overlay" on:click={handleCancel}>
-  <div class="modal" on:click|stopPropagation>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal" role="dialog" aria-modal="true" tabindex="-1" on:click|stopPropagation>
     <div class="modal-header">
       <h2>{session ? 'Edit Session' : 'Add New Session'}</h2>
       <button class="close-btn" on:click={handleCancel}>&times;</button>
@@ -141,7 +143,7 @@
           bind:value={notes}
           rows="3"
           placeholder="Add any notes about this session..."
-        />
+        ></textarea>
       </div>
 
       <div class="form-actions">
