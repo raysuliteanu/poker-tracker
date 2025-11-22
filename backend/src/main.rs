@@ -5,7 +5,7 @@ mod models;
 mod schema;
 mod utils;
 
-use dotenv::dotenv;
+use dotenvy::dotenv;
 
 use crate::app::PokerApp;
 
