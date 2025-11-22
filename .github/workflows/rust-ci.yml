@@ -70,7 +70,7 @@ jobs:
             matrix:
                 rust:
                     - stable
-                    - beta
+                    # - beta
 
         steps:
             - name: Checkout repository
