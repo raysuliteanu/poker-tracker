@@ -7,7 +7,7 @@ use validator::Validate;
 
 use crate::models::{
     CreatePokerSessionRequest, NewPokerSession, PokerSession, SessionWithProfit,
-    UpdatePokerSessionRequest,
+    UpdatePokerSessionRequest, calculate_profit,
 };
 use crate::schema::poker_sessions;
 use crate::utils::DbPool;
@@ -100,11 +100,7 @@ pub async fn get_sessions(pool: web::Data<DbPool>, req: HttpRequest) -> impl Res
             let sessions_with_profit: Vec<SessionWithProfit> = sessions
                 .into_iter()
                 .map(|s| {
-                    let total_invested = &s.buy_in_amount + &s.rebuy_amount;
-                    let profit = (&s.cash_out_amount - &total_invested)
-                        .to_string()
-                        .parse::<f64>()
-                        .unwrap_or(0.0);
+                    let profit = calculate_profit(&s.buy_in_amount, &s.rebuy_amount, &s.cash_out_amount);
                     SessionWithProfit { session: s, profit }
                 })
                 .collect();
@@ -145,11 +141,7 @@ pub async fn get_session(
         .first::<PokerSession>(&mut conn)
     {
         Ok(session) => {
-            let total_invested = &session.buy_in_amount + &session.rebuy_amount;
-            let profit = (&session.cash_out_amount - &total_invested)
-                .to_string()
-                .parse::<f64>()
-                .unwrap_or(0.0);
+            let profit = calculate_profit(&session.buy_in_amount, &session.rebuy_amount, &session.cash_out_amount);
             HttpResponse::Ok().json(SessionWithProfit { session, profit })
         }
         Err(_) => HttpResponse::NotFound().json(serde_json::json!({

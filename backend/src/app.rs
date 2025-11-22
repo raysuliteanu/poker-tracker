@@ -14,11 +14,11 @@ use crate::utils;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
-pub(crate) struct PokerApp;
+pub(crate) struct PokerTrackerApp;
 
-impl PokerApp {
+impl PokerTrackerApp {
     pub fn new() -> Self {
-        PokerApp
+        PokerTrackerApp
     }
 
     pub async fn run(self) -> Result<()> {

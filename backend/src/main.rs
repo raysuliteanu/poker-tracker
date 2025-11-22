@@ -5,15 +5,17 @@ mod models;
 mod schema;
 mod utils;
 
+use std::io::Result;
+
 use dotenvy::dotenv;
 
-use crate::app::PokerApp;
+use crate::app::PokerTrackerApp;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<()> {
     dotenv().ok();
     env_logger::init();
 
-    let app = PokerApp::new();
+    let app = PokerTrackerApp::new();
     app.run().await
 }

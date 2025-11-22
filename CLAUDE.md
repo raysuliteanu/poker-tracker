@@ -107,3 +107,4 @@ diesel migration run
 - Auth middleware returns JSON errors (not plain text)
 - Frontend uses page reload after login/logout/register to ensure proper route re-evaluation
 - Navbar and footer use `position: fixed` for consistent viewport-width layout
+- always run `cargo clippy` for backend changes and address warnings
