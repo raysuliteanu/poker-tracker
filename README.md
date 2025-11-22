@@ -257,7 +257,49 @@ npm run preview
 
 # Type check
 npm run check
+
+# Run unit tests
+npm test
 ```
+
+## Testing
+
+### Backend Tests
+
+The backend uses Rust's built-in test framework. Tests cover authentication, session management, and API endpoints.
+
+```bash
+cd backend
+cargo test
+```
+
+### Frontend Tests
+
+The frontend uses Vitest with Testing Library for unit tests. Tests cover:
+- **Stores**: Auth store, theme store state management
+- **Components**: SessionTable, SessionForm, BankrollChart, Navigation
+- **Pages**: Dashboard functionality and user interactions
+
+```bash
+cd frontend
+npm test              # Run tests in watch mode
+npm test -- --run     # Run tests once
+```
+
+Test files are located in `frontend/src/tests/` and follow the pattern `*.test.ts`.
+
+## CI/CD
+
+GitHub Actions workflows automatically run on push and pull requests to the `main` branch:
+
+### Backend CI (`.github/workflows/rust-ci.yml`)
+- Code formatting check (`cargo fmt`)
+- Security audit (`cargo audit`)
+- Unit tests (`cargo test`)
+
+### Frontend CI (`.github/workflows/frontend-ci.yml`)
+- TypeScript type checking (`npm run check`)
+- Unit tests (`npm test`)
 
 ## Contributing
 
