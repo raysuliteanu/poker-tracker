@@ -1,0 +1,69 @@
+name: Rust CI
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    # --- 1. Formatting Check Job ---
+    format:
+        name: Check formatting
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            # Install the Rust toolchain (stable is sufficient for formatting)
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: stable
+                  # Install the 'rustfmt' component explicitly
+                  components: rustfmt
+
+            # Run the formatting check. If any file is not formatted, this command will fail.
+            - name: Run cargo fmt --check
+              run: cargo fmt -- --check
+
+    # --- 2. Test Job (existing) ---
+    test:
+        name: Test on Rust ${{ matrix.rust }}
+        runs-on: ubuntu-latest
+        # The tests only run after the format check passes
+        needs: format
+
+        strategy:
+            matrix:
+                rust:
+                    - stable
+                    - beta
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ matrix.rust }}
+
+            - name: Cache dependencies
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-
+
+            - name: Run cargo test
+              run: cargo test --verbose
+
+            - name: Run cargo clippy
+              run: cargo clippy -- -D warnings
