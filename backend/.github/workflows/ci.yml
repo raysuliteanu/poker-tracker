@@ -29,12 +29,35 @@ jobs:
             - name: Run cargo fmt --check
               run: cargo fmt -- --check
 
-    # --- 2. Test Job (existing) ---
+    # --- 2. Security Audit Job ---
+    audit:
+        name: Security audit
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Check for Cargo file changes
+              uses: dorny/paths-filter@v3
+              id: changes
+              with:
+                  filters: |
+                      cargo:
+                        - 'Cargo.toml'
+                        - 'Cargo.lock'
+
+            - name: Run cargo audit
+              if: steps.changes.outputs.cargo == 'true' || github.event_name == 'push'
+              uses: rustsec/audit-check@v2.0.0
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+    # --- 3. Test Job ---
     test:
         name: Test on Rust ${{ matrix.rust }}
         runs-on: ubuntu-latest
-        # The tests only run after the format check passes
-        needs: format
+        # Tests run after format and audit checks pass
+        needs: [format, audit]
 
         strategy:
             matrix:
