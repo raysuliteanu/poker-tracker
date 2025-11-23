@@ -133,7 +133,7 @@ Services will be available at:
 
 - Frontend: <http://localhost:8888>
 - Backend API: <http://localhost:8080>
-- PostgreSQL: localhost:5432
+- PostgreSQL: localhost:5433 (non-default port to avoid conflicts with local PostgreSQL)
 
 ## API Endpoints
 
