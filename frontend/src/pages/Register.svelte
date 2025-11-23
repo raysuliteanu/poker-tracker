@@ -89,7 +89,6 @@
           type="password"
           bind:value={password}
           required
-          minlength="8"
           placeholder="At least 8 characters"
         />
       </div>

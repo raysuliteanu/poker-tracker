@@ -1,0 +1,67 @@
+services:
+    postgres:
+        image: postgres:16-alpine
+        container_name: poker_tracker_e2e_db
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: poker_tracker
+        ports:
+            - "5433:5432"
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+    backend:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        container_name: poker_tracker_e2e_backend
+        environment:
+            DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker
+            JWT_SECRET: e2e-test-secret
+            RUST_LOG: info
+            HOST: 0.0.0.0
+            PORT: 8080
+        depends_on:
+            postgres:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/api/health"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+            start_period: 15s
+
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        container_name: poker_tracker_e2e_frontend
+        environment:
+            VITE_API_URL: http://backend:8080/api
+        depends_on:
+            backend:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:80/"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+    playwright:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile-playwright
+        container_name: poker_tracker_e2e_playwright
+        environment:
+            BASE_URL: http://frontend:80
+            CI: "true"
+        depends_on:
+            frontend:
+                condition: service_healthy
+        volumes:
+            - ./frontend/playwright-report:/app/playwright-report
+            - ./frontend/test-results:/app/test-results

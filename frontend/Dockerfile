@@ -12,11 +12,16 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application with API URL set to use nginx proxy
+ENV VITE_API_URL=/api
+
 RUN npm run build
 
 # Production stage
 FROM nginx:alpine
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

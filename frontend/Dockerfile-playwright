@@ -1,0 +1,19 @@
+# Use the official Playwright image matching the version in package.json
+# 'noble' corresponds to Ubuntu 24.04 LTS
+FROM mcr.microsoft.com/playwright:v1.56.1-noble
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies (Playwright browsers are pre-installed in the base image)
+RUN npm ci
+
+# Copy test configuration and test files only (not the full app)
+COPY playwright.config.ts ./
+COPY e2e ./e2e
+
+# Run tests against external services (BASE_URL set via environment)
+CMD ["npx", "playwright", "test"]
+
