@@ -3,6 +3,31 @@
 A full-stack web application for tracking poker bankroll and session history
 with detailed analytics and visualizations.
 
+## Background
+
+This is at the moment a "toy" project to see if I can build a full app with
+LLM (specifically Claude Code, though a little Gemini thrown in). The idea of
+the app itself though was based on a need; I did a quick search for webapps that
+do poker session tracking, where I can enter some key things about a given poker
+session - what I started with, what additional I might have bought in for, what
+I left with, that sort of thing. But I didn't see anything. What I did find were
+desktop apps for Windows and MacOS. But I'm using Linux.
+
+So I decided to build this app. Once I get the basic stuff going, I might make it
+more public and see if others find it useful. Actually hosting it on, say, AWS,
+will cost a little bit, so I set up sponsor links since otherwise at least for
+now I have no intention of making this a pay site. Depending on where it goes,
+if anywhere, I might do ads, or might charge.
+
+If you do think this might be useful to you, please leave a comment via the wiki.
+If you have suggestions, submit an issue. If you want to contribute, feel free
+to fork and make a PR.
+
+> [!INFO]
+> Just remember, right now this is a side project mostly for learning; I'm a
+> backend guy so the Rust side is my thing; the frontend is 100% GenAI right now
+> as I learn it.
+
 ## Features
 
 ### User Management
