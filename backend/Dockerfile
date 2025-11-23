@@ -21,8 +21,8 @@ COPY diesel.toml ./
 # Build the application
 RUN cargo build --release
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Runtime stage - use trixie to match rust:1.91-slim glibc version
+FROM debian:trixie-slim
 
 WORKDIR /app
 
@@ -30,6 +30,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libpq5 \
     ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from builder

@@ -1,0 +1,30 @@
+# docker-compose.perf.yml
+# Overrides for performance testing.
+# Use with: docker compose -f docker-compose.yml -f docker-compose.perf.yml up
+
+services:
+    postgres:
+        container_name: poker_tracker_perf_db
+        environment:
+            POSTGRES_DB: poker_tracker_perf_test
+        volumes:
+            - postgres_perf_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 2s
+            timeout: 5s
+            retries: 10
+
+    backend:
+        container_name: poker_tracker_perf_backend
+        environment:
+            DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker_perf_test
+            RUST_LOG: warn # Reduce logging noise during performance tests
+
+    frontend:
+        # We don't need the frontend for backend performance testing
+        deploy:
+            replicas: 0
+
+volumes:
+    postgres_perf_data:

@@ -157,7 +157,7 @@ Services will be available at:
 
 ### Backend (.env)
 
-```
+```sh
 DATABASE_URL=postgres://postgres:password@localhost/poker_tracker
 JWT_SECRET=your-secret-key-change-this-in-production
 RUST_LOG=info
@@ -167,7 +167,7 @@ PORT=8080
 
 ### Frontend (.env)
 
-```
+```sh
 VITE_API_URL=http://localhost:8080/api
 ```
 
@@ -266,7 +266,8 @@ npm test
 
 ### Backend Tests
 
-The backend uses Rust's built-in test framework. Tests cover authentication, session management, and API endpoints.
+The backend uses Rust's built-in test framework. Tests cover authentication,
+session management, and API endpoints.
 
 ```bash
 cd backend
@@ -276,6 +277,7 @@ cargo test
 ### Frontend Tests
 
 The frontend uses Vitest with Testing Library for unit tests. Tests cover:
+
 - **Stores**: Auth store, theme store state management
 - **Components**: SessionTable, SessionForm, BankrollChart, Navigation
 - **Pages**: Dashboard functionality and user interactions
@@ -288,16 +290,56 @@ npm test -- --run     # Run tests once
 
 Test files are located in `frontend/src/tests/` and follow the pattern `*.test.ts`.
 
+### Performance Tests
+
+The project includes k6 load tests for the backend API. Performance tests use a
+separate database to avoid interfering with development data.
+
+**Prerequisites:**
+
+- [k6](https://k6.io/docs/get-started/installation/) installed locally
+- Docker and Docker Compose
+
+**Running Performance Tests:**
+
+```bash
+# Start the performance test environment (separate database)
+docker compose -f docker-compose.yml -f docker-compose.perf.yml up -d --build
+
+# Wait for services to be healthy
+docker compose -f docker-compose.yml -f docker-compose.perf.yml ps
+
+# Run k6 performance tests
+k6 run performance-test.js
+
+# Tear down when finished
+docker compose -f docker-compose.yml -f docker-compose.perf.yml down
+```
+
+The performance test (`performance-test.js`) simulates user workflows including:
+
+- User registration and login
+- Creating poker sessions
+- Retrieving session data
+
+Default thresholds:
+
+- HTTP error rate < 1%
+- 95th percentile response time < 500ms
+
 ## CI/CD
 
-GitHub Actions workflows automatically run on push and pull requests to the `main` branch:
+GitHub Actions workflows automatically run on push and pull requests to the `main`
+branch:
 
 ### Backend CI (`.github/workflows/rust-ci.yml`)
+
 - Code formatting check (`cargo fmt`)
 - Security audit (`cargo audit`)
 - Unit tests (`cargo test`)
 
 ### Frontend CI (`.github/workflows/frontend-ci.yml`)
+
 - TypeScript type checking (`npm run check`)
 - Unit tests (`npm test`)
 
@@ -311,7 +353,7 @@ GitHub Actions workflows automatically run on push and pull requests to the `mai
 
 ## License
 
-MIT License - see LICENSE file for details
+Apache License - see LICENSE file for details
 
 ## Support
 
