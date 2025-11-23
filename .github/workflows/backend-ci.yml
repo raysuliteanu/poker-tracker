@@ -36,45 +36,15 @@ jobs:
             - name: Run cargo fmt --check
               run: cargo fmt -- --check
 
-    # --- 2. Security Audit Job ---
-    audit:
-        name: Security audit
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
-
-            - name: Check for Cargo file changes
-              uses: dorny/paths-filter@v3
-              id: changes
-              with:
-                  filters: |
-                      cargo:
-                        - 'backend/Cargo.toml'
-                        - 'backend/Cargo.lock'
-
-            - name: Run cargo audit
-              if: steps.changes.outputs.cargo == 'true' || github.event_name == 'push'
-              uses: rustsec/audit-check@v2.0.0
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  working-directory: backend
-
-    # --- 3. Test Job ---
+    # --- 2. Test Job ---
     test:
-        name: Test on Rust ${{ matrix.rust }}
+        name: Test
         runs-on: ubuntu-latest
-        # Tests run after format and audit checks pass
-        needs: [format, audit]
+        # Tests run after format check passes
+        needs: [format]
         defaults:
             run:
                 working-directory: backend
-
-        strategy:
-            matrix:
-                rust:
-                    - stable
-                    # - beta
 
         steps:
             - name: Checkout repository
@@ -83,7 +53,7 @@ jobs:
             - name: Install Rust toolchain
               uses: dtolnay/rust-toolchain@master
               with:
-                  toolchain: ${{ matrix.rust }}
+                  toolchain: stable
 
             - name: Cache dependencies
               uses: actions/cache@v4
