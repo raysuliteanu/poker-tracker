@@ -7,6 +7,8 @@
 /frontend/dist/
 /frontend/.env
 /frontend/.env.local
+/frontend/playwright-report/
+/frontend/test-results/
 
 # Database
 *.db
