@@ -30,6 +30,7 @@
 
       <div class="nav-links">
         <a href="#/" use:link>Dashboard</a>
+        <a href="#/charts" use:link>Charts</a>
         <a href="#/settings" use:link>Settings</a>
         <button on:click={toggleTheme} class="theme-toggle" title="Toggle theme">
           {#if currentTheme === 'light'}

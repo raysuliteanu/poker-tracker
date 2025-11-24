@@ -106,16 +106,6 @@ describe('Dashboard', () => {
     });
   });
 
-  it('renders BankrollChart component', async () => {
-    vi.mocked(api.sessions.getAll).mockResolvedValue({ data: mockSessions });
-
-    render(Dashboard);
-
-    await waitFor(() => {
-      expect(screen.getByText('Bankroll Over Time')).toBeInTheDocument();
-    });
-  });
-
   it('renders SessionTable with sessions', async () => {
     vi.mocked(api.sessions.getAll).mockResolvedValue({ data: mockSessions });
 

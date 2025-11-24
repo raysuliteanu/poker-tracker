@@ -2,14 +2,11 @@
   import { onMount } from 'svelte';
   import { authStore } from '../stores/auth';
   import { api, type PokerSession } from '../lib/api';
-  import SessionTable from '../components/SessionTable.svelte';
-  import SessionForm from '../components/SessionForm.svelte';
+  import BankrollChart from '../components/BankrollChart.svelte';
 
   let sessions: PokerSession[] = [];
   let loading = true;
   let error = '';
-  let showForm = false;
-  let editingSession: PokerSession | null = null;
 
   onMount(async () => {
     await loadSessions();
@@ -30,51 +27,14 @@
     }
   }
 
-  function handleAddNew() {
-    editingSession = null;
-    showForm = true;
-  }
-
-  function handleEdit(session: PokerSession) {
-    editingSession = session;
-    showForm = true;
-  }
-
-  function handleCloseForm() {
-    showForm = false;
-    editingSession = null;
-  }
-
-  async function handleSave() {
-    await loadSessions();
-    handleCloseForm();
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this session?')) {
-      return;
-    }
-
-    const response = await api.sessions.delete(id);
-
-    if (response.error) {
-      alert(response.error);
-    } else {
-      await loadSessions();
-    }
-  }
-
   $: totalProfit = sessions.reduce((sum, s) => sum + (s.profit || 0), 0);
   $: totalSessions = sessions.length;
   $: totalHours = sessions.reduce((sum, s) => sum + s.duration_minutes / 60, 0);
 </script>
 
-<div class="dashboard">
+<div class="charts">
   <div class="header">
-    <h1>Poker Bankroll Tracker</h1>
-    <button on:click={handleAddNew} class="btn-primary">
-      Add Session
-    </button>
+    <h1>Charts & Analytics</h1>
   </div>
 
   {#if error}
@@ -105,18 +65,19 @@
   </div>
 
   {#if loading}
-    <div class="loading">Loading sessions...</div>
+    <div class="loading">Loading data...</div>
+  {:else if sessions.length === 0}
+    <div class="empty-state">
+      <p>No poker sessions recorded yet.</p>
+      <p>Add sessions from the Dashboard to see charts!</p>
+    </div>
   {:else}
-    <SessionTable {sessions} on:edit={(e) => handleEdit(e.detail)} on:delete={(e) => handleDelete(e.detail)} />
-  {/if}
-
-  {#if showForm}
-    <SessionForm session={editingSession} on:save={handleSave} on:cancel={handleCloseForm} />
+    <BankrollChart {sessions} />
   {/if}
 </div>
 
 <style>
-  .dashboard {
+  .charts {
     width: 100%;
     max-width: 1400px;
     margin: 0 auto;
@@ -135,22 +96,6 @@
     margin: 0;
     color: var(--color-text);
     font-size: 1.5rem;
-  }
-
-  .btn-primary {
-    padding: 0.5rem 1rem;
-    background-color: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .btn-primary:hover {
-    background-color: var(--color-primary-dark);
   }
 
   .error {
@@ -201,15 +146,19 @@
     color: var(--color-text-secondary);
   }
 
-  @media (max-width: 768px) {
-    .dashboard {
-      padding: 1rem;
-    }
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color-text-secondary);
+  }
 
-    .header {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: stretch;
+  .empty-state p {
+    margin: 0.5rem 0;
+  }
+
+  @media (max-width: 768px) {
+    .charts {
+      padding: 1rem;
     }
 
     .stats {

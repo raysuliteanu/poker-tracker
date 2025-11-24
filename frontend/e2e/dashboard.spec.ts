@@ -511,6 +511,74 @@ test.describe('Dashboard - Notes Functionality', () => {
   });
 });
 
+test.describe('Dashboard - Charts Navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginUser(page);
+  });
+
+  test('navigates to Charts page from navbar', async ({ page }) => {
+    // Should be on dashboard initially
+    await expect(page.getByRole('heading', { name: 'Poker Bankroll Tracker' })).toBeVisible();
+
+    // Click Charts link in navbar
+    await page.getByRole('link', { name: 'Charts' }).click();
+
+    // Should navigate to Charts page
+    await page.waitForURL(/#\/charts/);
+    await expect(page.getByRole('heading', { name: 'Charts & Analytics' })).toBeVisible();
+  });
+
+  test('charts page displays stats cards', async ({ page }) => {
+    // Add a session first
+    await addSession(page, {
+      date: '2024-01-15',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+      notes: 'Test session',
+    });
+
+    // Navigate to Charts
+    await page.getByRole('link', { name: 'Charts' }).click();
+    await page.waitForURL(/#\/charts/);
+
+    // Verify stats are displayed
+    await expect(page.getByText('Total Profit/Loss')).toBeVisible();
+    await expect(page.getByText('Total Sessions')).toBeVisible();
+    await expect(page.getByText('Total Hours')).toBeVisible();
+    await expect(page.getByText('Hourly Rate')).toBeVisible();
+  });
+
+  test('charts page shows empty state when no sessions', async ({ page }) => {
+    // Navigate to Charts immediately (no sessions added)
+    await page.getByRole('link', { name: 'Charts' }).click();
+    await page.waitForURL(/#\/charts/);
+
+    // Should show empty state
+    await expect(page.getByText('No poker sessions recorded yet.')).toBeVisible();
+    await expect(page.getByText('Add sessions from the Dashboard to see charts!')).toBeVisible();
+  });
+
+  test('charts page displays bankroll chart when sessions exist', async ({ page }) => {
+    // Add sessions
+    await addSession(page, {
+      date: '2024-01-15',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+    });
+
+    // Navigate to Charts
+    await page.getByRole('link', { name: 'Charts' }).click();
+    await page.waitForURL(/#\/charts/);
+
+    // Verify chart is displayed (look for the chart title)
+    await expect(page.getByText('Bankroll Over Time')).toBeVisible();
+  });
+});
+
 test.describe('Dashboard - Stats Display', () => {
   test.beforeEach(async ({ page }) => {
     await loginUser(page);

@@ -13,6 +13,7 @@
   import Login from './pages/Login.svelte';
   import Register from './pages/Register.svelte';
   import Dashboard from './pages/Dashboard.svelte';
+  import Charts from './pages/Charts.svelte';
   import Settings from './pages/Settings.svelte';
   import Help from './pages/Help.svelte';
   import Privacy from './pages/Privacy.svelte';
@@ -29,6 +30,7 @@
   // Protected routes requiring authentication
   const protectedRoutes = {
     '/': Dashboard,
+    '/charts': Charts,
     '/settings': Settings,
     '/help': Help,
     '/privacy': Privacy,

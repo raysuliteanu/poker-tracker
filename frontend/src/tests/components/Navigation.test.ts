@@ -31,6 +31,7 @@ describe('Navigation', () => {
 
     expect(screen.getByText('Poker Tracker')).toBeInTheDocument();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Charts')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getByText('Logout')).toBeInTheDocument();
   });
@@ -41,9 +42,11 @@ describe('Navigation', () => {
     render(Navigation);
 
     const dashboardLink = screen.getByText('Dashboard').closest('a');
+    const chartsLink = screen.getByText('Charts').closest('a');
     const settingsLink = screen.getByText('Settings').closest('a');
 
     expect(dashboardLink).toHaveAttribute('href', '#/');
+    expect(chartsLink).toHaveAttribute('href', '#/charts');
     expect(settingsLink).toHaveAttribute('href', '#/settings');
   });
 
