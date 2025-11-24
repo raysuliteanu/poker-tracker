@@ -123,7 +123,7 @@
     width: 100%;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 1rem;
     flex: 1;
   }
 
@@ -131,20 +131,22 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
   }
 
   h1 {
     margin: 0;
     color: var(--color-text);
+    font-size: 1.5rem;
   }
 
   .btn-primary {
-    padding: 0.75rem 1.5rem;
+    padding: 0.5rem 1rem;
     background-color: var(--color-primary);
     color: white;
     border: none;
     border-radius: 4px;
+    font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
@@ -164,26 +166,26 @@
 
   .stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
   }
 
   .stat-card {
     background: var(--color-bg-secondary);
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
   .stat-label {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: var(--color-text-secondary);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
   }
 
   .stat-value {
-    font-size: 1.75rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: var(--color-text);
   }

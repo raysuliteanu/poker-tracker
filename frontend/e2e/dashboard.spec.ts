@@ -130,7 +130,13 @@ test.describe('Dashboard - Poker Sessions', () => {
     // Verify session appears in the table
     await expect(page.locator('table tbody')).toContainText('1/15/2024'); // Date formatted by browser
     await expect(page.locator('table tbody')).toContainText('$150.00'); // Profit
+
+    // Verify notes are accessible via the view notes button
+    await expect(page.locator('button[aria-label="View notes"]')).toBeVisible();
+    await page.locator('button[aria-label="View notes"]').first().click();
     await expect(page.getByText(notes)).toBeVisible();
+    // Close the modal
+    await page.getByRole('button', { name: 'Close' }).click();
 
     // Verify stats updated correctly
     await expect(page.locator('.stat-value.profit')).toContainText('$150.00'); // Total profit
@@ -266,8 +272,12 @@ test.describe('Dashboard - Edit Sessions', () => {
     await expect(page.getByRole('heading', { name: 'Edit Session' })).not.toBeVisible();
 
     // Verify updated data in table
-    await expect(page.getByText('Updated notes after edit')).toBeVisible();
     await expect(page.locator('table tbody')).toContainText('$150.00'); // New profit: 300 - 150 = 150
+
+    // Verify updated notes via view notes button
+    await page.locator('button[aria-label="View notes"]').first().click();
+    await expect(page.getByText('Updated notes after edit')).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
 
     // Verify stats updated correctly (3 hours now instead of 2)
     await expect(page.getByText('3.0')).toBeVisible(); // Total hours
@@ -290,8 +300,12 @@ test.describe('Dashboard - Edit Sessions', () => {
 
     // Verify original data still in table (profit still $50)
     await expect(page.locator('table tbody')).toContainText('$50.00');
+
+    // Verify original notes still there via view notes button
+    await page.locator('button[aria-label="View notes"]').first().click();
     await expect(page.getByText('Original notes')).toBeVisible();
     await expect(page.getByText('This should not be saved')).not.toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
   });
 
   test('edits session to change from win to loss', async ({ page }) => {
@@ -344,8 +358,8 @@ test.describe('Dashboard - Delete Sessions', () => {
     // Wait a moment for the deletion to process
     await page.waitForTimeout(500);
 
-    // Verify session is gone
-    await expect(page.getByText('Session to delete')).not.toBeVisible();
+    // Verify session is gone - no view notes button should be present
+    await expect(page.locator('button[aria-label="View notes"]')).not.toBeVisible();
 
     // Verify stats reset to zero
     await expect(page.locator('.stat-value').filter({ hasText: '$0.00' }).first()).toBeVisible();
@@ -365,9 +379,135 @@ test.describe('Dashboard - Delete Sessions', () => {
     // Wait a moment
     await page.waitForTimeout(500);
 
-    // Verify session is still there
-    await expect(page.getByText('Session to delete')).toBeVisible();
+    // Verify session is still there - view notes button and profit still showing
+    await expect(page.locator('button[aria-label="View notes"]')).toBeVisible();
     await expect(page.locator('table tbody')).toContainText('$100.00'); // Profit still showing
+  });
+});
+
+test.describe('Dashboard - Notes Functionality', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginUser(page);
+  });
+
+  test('shows view notes button only for sessions with notes', async ({ page }) => {
+    // Add session with notes
+    await addSession(page, {
+      date: '2024-01-10',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+      notes: 'Session with notes',
+    });
+
+    // Add session without notes
+    await addSession(page, {
+      date: '2024-01-11',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+    });
+
+    // Should have exactly 1 view notes button
+    const viewNotesButtons = page.locator('button[aria-label="View notes"]');
+    await expect(viewNotesButtons).toHaveCount(1);
+  });
+
+  test('opens notes modal when view notes button is clicked', async ({ page }) => {
+    const notes = 'This is a test note with multiple lines\nLine 2\nLine 3';
+
+    await addSession(page, {
+      date: '2024-01-10',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+      notes,
+    });
+
+    // Click view notes button
+    await page.locator('button[aria-label="View notes"]').first().click();
+
+    // Modal should be visible with the correct content
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText(/Session Notes -/)).toBeVisible();
+    await expect(page.getByText(notes)).toBeVisible();
+  });
+
+  test('closes notes modal when close button is clicked', async ({ page }) => {
+    await addSession(page, {
+      date: '2024-01-10',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+      notes: 'Test notes',
+    });
+
+    // Open modal
+    await page.locator('button[aria-label="View notes"]').first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Close modal with close button
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+
+  test('closes notes modal when clicking overlay', async ({ page }) => {
+    await addSession(page, {
+      date: '2024-01-10',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+      notes: 'Test notes',
+    });
+
+    // Open modal
+    await page.locator('button[aria-label="View notes"]').first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Close modal by clicking overlay
+    await page.locator('.modal-overlay').click({ position: { x: 10, y: 10 } });
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+
+  test('closes notes modal with Escape key', async ({ page }) => {
+    await addSession(page, {
+      date: '2024-01-10',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+      notes: 'Test notes',
+    });
+
+    // Open modal
+    await page.locator('button[aria-label="View notes"]').first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Close modal with Escape key
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+  });
+
+  test('displays session date in modal header', async ({ page }) => {
+    await addSession(page, {
+      date: '2024-01-15',
+      duration: 120,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 200,
+      notes: 'Test notes',
+    });
+
+    // Open modal
+    await page.locator('button[aria-label="View notes"]').first().click();
+
+    // Verify modal header contains the session date
+    await expect(page.getByText(/Session Notes - .*1\/15\/2024/)).toBeVisible();
   });
 });
 

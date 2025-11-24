@@ -75,12 +75,87 @@ describe('SessionTable', () => {
     expect(screen.getByText('$-70.00')).toBeInTheDocument();
   });
 
-  it('displays notes or dash for empty notes', () => {
+  it('displays view notes button only for sessions with notes', () => {
     render(SessionTable, { props: { sessions: mockSessions } });
 
+    // Should have 2 view notes buttons (sessions 1 and 2 have notes)
+    const viewNotesButtons = screen.getAllByRole('button', { name: /view notes/i });
+    expect(viewNotesButtons).toHaveLength(2);
+  });
+
+  it('opens modal with notes when view notes button is clicked', async () => {
+    render(SessionTable, { props: { sessions: mockSessions } });
+
+    // Click the first view notes button
+    const viewNotesButtons = screen.getAllByRole('button', { name: /view notes/i });
+    await fireEvent.click(viewNotesButtons[0]);
+
+    // Modal should be visible with the notes
     expect(screen.getByText('Good session')).toBeInTheDocument();
-    expect(screen.getByText('Tough table')).toBeInTheDocument();
-    expect(screen.getByText('-')).toBeInTheDocument(); // Session 3 has null notes
+    expect(screen.getByText(/Session Notes -/)).toBeInTheDocument();
+  });
+
+  it('closes modal when close button is clicked', async () => {
+    render(SessionTable, { props: { sessions: mockSessions } });
+
+    // Open modal
+    const viewNotesButtons = screen.getAllByRole('button', { name: /view notes/i });
+    await fireEvent.click(viewNotesButtons[0]);
+
+    // Modal should be visible
+    expect(screen.getByText('Good session')).toBeInTheDocument();
+
+    // Close modal
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await fireEvent.click(closeButton);
+
+    // Modal should be closed - notes text should not be visible
+    expect(screen.queryByText('Good session')).not.toBeInTheDocument();
+  });
+
+  it('closes modal when clicking overlay', async () => {
+    render(SessionTable, { props: { sessions: mockSessions } });
+
+    // Open modal
+    const viewNotesButtons = screen.getAllByRole('button', { name: /view notes/i });
+    await fireEvent.click(viewNotesButtons[0]);
+
+    // Modal should be visible
+    expect(screen.getByText('Good session')).toBeInTheDocument();
+
+    // Click overlay (the modal-overlay div)
+    const overlay = screen.getByText('Good session').closest('.modal')?.parentElement;
+    if (overlay) {
+      await fireEvent.click(overlay);
+    }
+
+    // Modal should be closed
+    expect(screen.queryByText('Good session')).not.toBeInTheDocument();
+  });
+
+  it('does not show view notes button for sessions without notes', () => {
+    const sessionsWithoutNotes = [
+      {
+        ...mockSessions[2],
+        notes: null,
+      },
+      {
+        ...mockSessions[2],
+        id: 'session-4',
+        notes: '',
+      },
+      {
+        ...mockSessions[2],
+        id: 'session-5',
+        notes: '   ', // whitespace only
+      },
+    ];
+
+    render(SessionTable, { props: { sessions: sessionsWithoutNotes } });
+
+    // Should have no view notes buttons
+    const viewNotesButtons = screen.queryAllByRole('button', { name: /view notes/i });
+    expect(viewNotesButtons).toHaveLength(0);
   });
 
   it('renders edit and delete buttons for each session', () => {
