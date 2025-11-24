@@ -27,9 +27,6 @@
     }
   }
 
-  $: totalProfit = sessions.reduce((sum, s) => sum + (s.profit || 0), 0);
-  $: totalSessions = sessions.length;
-  $: totalHours = sessions.reduce((sum, s) => sum + s.duration_minutes / 60, 0);
 </script>
 
 <div class="charts">
@@ -40,29 +37,6 @@
   {#if error}
     <div class="error">{error}</div>
   {/if}
-
-  <div class="stats">
-    <div class="stat-card">
-      <div class="stat-label">Total Profit/Loss</div>
-      <div class="stat-value" class:profit={totalProfit >= 0} class:loss={totalProfit < 0}>
-        ${totalProfit.toFixed(2)}
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Total Sessions</div>
-      <div class="stat-value">{totalSessions}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Total Hours</div>
-      <div class="stat-value">{totalHours.toFixed(1)}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Hourly Rate</div>
-      <div class="stat-value">
-        ${totalHours > 0 ? (totalProfit / totalHours).toFixed(2) : '0.00'}/hr
-      </div>
-    </div>
-  </div>
 
   {#if loading}
     <div class="loading">Loading data...</div>
@@ -106,40 +80,6 @@
     margin-bottom: 1rem;
   }
 
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-  }
-
-  .stat-card {
-    background: var(--color-bg-secondary);
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-
-  .stat-label {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    margin-bottom: 0.25rem;
-  }
-
-  .stat-value {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-text);
-  }
-
-  .stat-value.profit {
-    color: #10b981;
-  }
-
-  .stat-value.loss {
-    color: #ef4444;
-  }
-
   .loading {
     text-align: center;
     padding: 2rem;
@@ -159,10 +99,6 @@
   @media (max-width: 768px) {
     .charts {
       padding: 1rem;
-    }
-
-    .stats {
-      grid-template-columns: 1fr 1fr;
     }
   }
 </style>

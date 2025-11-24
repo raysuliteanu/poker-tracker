@@ -528,26 +528,13 @@ test.describe('Dashboard - Charts Navigation', () => {
     await expect(page.getByRole('heading', { name: 'Charts & Analytics' })).toBeVisible();
   });
 
-  test('charts page displays stats cards', async ({ page }) => {
-    // Add a session first
-    await addSession(page, {
-      date: '2024-01-15',
-      duration: 120,
-      buyIn: 100,
-      rebuy: 0,
-      cashOut: 200,
-      notes: 'Test session',
-    });
-
+  test('charts page displays heading', async ({ page }) => {
     // Navigate to Charts
     await page.getByRole('link', { name: 'Charts' }).click();
     await page.waitForURL(/#\/charts/);
 
-    // Verify stats are displayed
-    await expect(page.getByText('Total Profit/Loss')).toBeVisible();
-    await expect(page.getByText('Total Sessions')).toBeVisible();
-    await expect(page.getByText('Total Hours')).toBeVisible();
-    await expect(page.getByText('Hourly Rate')).toBeVisible();
+    // Verify Charts page heading is displayed
+    await expect(page.getByRole('heading', { name: 'Charts & Analytics' })).toBeVisible();
   });
 
   test('charts page shows empty state when no sessions', async ({ page }) => {
