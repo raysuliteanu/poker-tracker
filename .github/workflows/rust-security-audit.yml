@@ -3,19 +3,19 @@ name: Security Audit
 on:
     schedule:
         # Run daily at 6:00 AM UTC
-        - cron: '0 6 * * *'
+        - cron: "0 6 * * *"
     push:
         branches:
             - main
         paths:
-            - 'backend/Cargo.toml'
-            - 'backend/Cargo.lock'
+            - "backend/Cargo.toml"
+            - "backend/Cargo.lock"
     pull_request:
         branches:
             - main
         paths:
-            - 'backend/Cargo.toml'
-            - 'backend/Cargo.lock'
+            - "backend/Cargo.toml"
+            - "backend/Cargo.lock"
 
 jobs:
     audit:
