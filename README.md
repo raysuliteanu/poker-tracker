@@ -328,18 +328,20 @@ separate database to avoid interfering with development data.
 **Running Performance Tests:**
 
 ```bash
-# Start the performance test environment (separate database)
-docker compose -f docker-compose.yml -f docker-compose.perf.yml up -d --build
+# Quick way: Use the helper script
+./run-perf-tests.sh
 
+# Manual way: Run docker-compose commands directly
+docker compose -f docker-compose.yml -f docker-compose.perf.yml up -d --build
 # Wait for services to be healthy
 docker compose -f docker-compose.yml -f docker-compose.perf.yml ps
-
 # Run k6 performance tests
 k6 run performance-test.js
-
 # Tear down when finished
 docker compose -f docker-compose.yml -f docker-compose.perf.yml down
 ```
+
+The helper script (`run-perf-tests.sh`) automates the entire workflow: starting the performance environment, waiting for services to be healthy, running k6 tests, and tearing down afterward.
 
 The performance test (`performance-test.js`) simulates user workflows including:
 
@@ -351,6 +353,31 @@ Default thresholds:
 
 - HTTP error rate < 1%
 - 95th percentile response time < 500ms
+
+### E2E Tests
+
+The project includes Playwright end-to-end tests for the full stack application.
+
+**Prerequisites:**
+
+- Docker and Docker Compose
+
+**Running E2E Tests:**
+
+```bash
+# Quick way: Use the helper script
+./run-e2e-tests.sh
+
+# Manual way: Run docker-compose commands directly
+docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from playwright
+docker compose -f docker-compose.e2e.yml down
+```
+
+The helper script (`run-e2e-tests.sh`) automates the entire workflow and reports where test artifacts are saved.
+
+Test reports and artifacts are saved to:
+- `frontend/playwright-report/` - HTML test reports
+- `frontend/test-results/` - Test artifacts, screenshots, and traces
 
 ## CI/CD
 
