@@ -52,7 +52,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('Loading sessions...')).toBeInTheDocument();
   });
 
-  it('renders dashboard header and Add Session button', async () => {
+  it('renders dashboard header and toolbar buttons', async () => {
     vi.mocked(api.sessions.getAll).mockResolvedValue({ data: mockSessions });
 
     render(Dashboard);
@@ -60,7 +60,8 @@ describe('Dashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('Poker Bankroll Tracker')).toBeInTheDocument();
     });
-    expect(screen.getByText('Add Session')).toBeInTheDocument();
+    expect(screen.getByLabelText('Add Session')).toBeInTheDocument();
+    expect(screen.getByLabelText('Export Sessions')).toBeInTheDocument();
   });
 
   it('displays error message when API fails', async () => {
@@ -140,7 +141,7 @@ describe('Dashboard', () => {
       expect(screen.getByText('Poker Bankroll Tracker')).toBeInTheDocument();
     });
 
-    const addButton = screen.getByText('Add Session');
+    const addButton = screen.getByLabelText('Add Session');
     await fireEvent.click(addButton);
 
     expect(screen.getByText('Add New Session')).toBeInTheDocument();
@@ -156,7 +157,7 @@ describe('Dashboard', () => {
     });
 
     // Open form
-    const addButton = screen.getByText('Add Session');
+    const addButton = screen.getByLabelText('Add Session');
     await fireEvent.click(addButton);
     expect(screen.getByText('Add New Session')).toBeInTheDocument();
 

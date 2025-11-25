@@ -47,7 +47,7 @@ async function addSession(
     notes?: string;
   }
 ) {
-  await page.getByRole('button', { name: 'Add Session' }).click();
+  await page.getByLabel('Add Session').click();
   await expect(page.getByRole('heading', { name: 'Add New Session' })).toBeVisible();
 
   await page.getByLabel('Session Date').fill(sessionData.date);
@@ -73,7 +73,7 @@ test.describe('Dashboard - Poker Sessions', () => {
 
   test('displays empty dashboard with zero stats', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Poker Bankroll Tracker' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add Session' })).toBeVisible();
+    await expect(page.getByLabel('Add Session')).toBeVisible();
 
     // Check stats cards show zeros
     await expect(page.getByText('Total Profit/Loss')).toBeVisible();
@@ -85,7 +85,7 @@ test.describe('Dashboard - Poker Sessions', () => {
   });
 
   test('opens and closes add session form', async ({ page }) => {
-    await page.getByRole('button', { name: 'Add Session' }).click();
+    await page.getByLabel('Add Session').click();
 
     // Form should be visible
     await expect(page.getByRole('heading', { name: 'Add New Session' })).toBeVisible();
@@ -102,7 +102,7 @@ test.describe('Dashboard - Poker Sessions', () => {
   });
 
   test('closes add session form by clicking overlay', async ({ page }) => {
-    await page.getByRole('button', { name: 'Add Session' }).click();
+    await page.getByLabel('Add Session').click();
     await expect(page.getByRole('heading', { name: 'Add New Session' })).toBeVisible();
 
     // Click on the modal overlay (not the modal itself)
@@ -111,7 +111,7 @@ test.describe('Dashboard - Poker Sessions', () => {
   });
 
   test('money inputs accept only whole dollars', async ({ page }) => {
-    await page.getByRole('button', { name: 'Add Session' }).click();
+    await page.getByLabel('Add Session').click();
 
     // Check buy-in input
     const buyInInput = page.getByLabel('Buy-in ($)');
@@ -225,7 +225,7 @@ test.describe('Dashboard - Poker Sessions', () => {
   });
 
   test('validates required fields when adding session', async ({ page }) => {
-    await page.getByRole('button', { name: 'Add Session' }).click();
+    await page.getByLabel('Add Session').click();
 
     // Try to submit without filling required fields
     await page.getByRole('button', { name: 'Save Session' }).click();
@@ -701,14 +701,22 @@ test.describe('Dashboard - Stats Display', () => {
       notes: 'Recent session, with comma',
     });
 
-    // Verify export section is visible
-    await expect(page.getByLabel('Export Sessions:')).toBeVisible();
-    await expect(page.locator('select#exportTimeRange')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+    // Verify export button is visible in toolbar
+    await expect(page.getByLabel('Export Sessions')).toBeVisible();
 
-    // Test export with "all" time range (default)
+    // Click export button to open dropdown
+    await page.getByLabel('Export Sessions').click();
+
+    // Verify dropdown menu is visible
+    await expect(page.getByText('Last 7 Days')).toBeVisible();
+    await expect(page.getByText('Last 30 Days')).toBeVisible();
+    await expect(page.getByText('Last 90 Days')).toBeVisible();
+    await expect(page.getByText('Last Year')).toBeVisible();
+    await expect(page.getByText('All Sessions')).toBeVisible();
+
+    // Test export with "all" time range
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export CSV' }).click();
+    await page.getByText('All Sessions').click();
     const download = await downloadPromise;
 
     // Verify filename
@@ -729,5 +737,58 @@ test.describe('Dashboard - Stats Display', () => {
     // Verify the profit/loss calculation is correct (should be in CSV)
     expect(csvContent).toContain('50.00'); // First session profit: 150 - 100 = 50
     expect(csvContent).toContain('100.00'); // Recent session profit: 300 - 200 = 100
+  });
+
+  test('export menu closes when clicking outside', async ({ page }) => {
+    // Add a session first
+    await addSession(page, {
+      date: '2024-01-15',
+      duration: 2,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 150,
+    });
+
+    // Open export menu
+    await page.getByLabel('Export Sessions').click();
+    await expect(page.getByText('Last 7 Days')).toBeVisible();
+
+    // Click outside the menu (on the stats area)
+    await page.locator('.stat-card').first().click();
+
+    // Menu should be closed
+    await expect(page.getByText('Last 7 Days')).not.toBeVisible();
+
+    // Open menu again
+    await page.getByLabel('Export Sessions').click();
+    await expect(page.getByText('Last 7 Days')).toBeVisible();
+
+    // Click outside the dashboard area (on the page body, away from content)
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
+
+    // Menu should be closed
+    await expect(page.getByText('Last 7 Days')).not.toBeVisible();
+  });
+
+  test('export menu stays open when clicking inside menu', async ({ page }) => {
+    // Add a session first
+    await addSession(page, {
+      date: '2024-01-15',
+      duration: 2,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 150,
+    });
+
+    // Open export menu
+    await page.getByLabel('Export Sessions').click();
+    await expect(page.getByText('Last 7 Days')).toBeVisible();
+
+    // Hover over a menu item (but don't click it)
+    await page.getByText('Last 30 Days').hover();
+
+    // Menu should still be visible
+    await expect(page.getByText('Last 7 Days')).toBeVisible();
+    await expect(page.getByText('Last 30 Days')).toBeVisible();
   });
 });

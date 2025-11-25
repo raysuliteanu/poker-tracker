@@ -12,9 +12,18 @@
   let editingSession: PokerSession | null = null;
   let exportTimeRange = 'all';
   let exporting = false;
+  let showExportMenu = false;
 
   onMount(async () => {
     await loadSessions();
+
+    // Add global click handler for closing export menu
+    document.addEventListener('click', handleClickOutside);
+
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
   });
 
   async function loadSessions() {
@@ -66,9 +75,14 @@
     }
   }
 
-  async function handleExport() {
+  function toggleExportMenu() {
+    showExportMenu = !showExportMenu;
+  }
+
+  async function handleExport(timeRange: string) {
+    showExportMenu = false;
     exporting = true;
-    const response = await api.sessions.export(exportTimeRange);
+    const response = await api.sessions.export(timeRange);
     exporting = false;
 
     if (response.error) {
@@ -81,11 +95,19 @@
       const url = URL.createObjectURL(response.data);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `poker-sessions-${exportTimeRange}.csv`;
+      link.download = `poker-sessions-${timeRange}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+    }
+  }
+
+  // Close export menu when clicking outside
+  function handleClickOutside(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (showExportMenu && !target.closest('.toolbar-export')) {
+      showExportMenu = false;
     }
   }
 
@@ -97,9 +119,6 @@
 <div class="dashboard">
   <div class="header">
     <h1>Poker Bankroll Tracker</h1>
-    <button on:click={handleAddNew} class="btn-primary">
-      Add Session
-    </button>
   </div>
 
   {#if error}
@@ -129,18 +148,56 @@
     </div>
   </div>
 
-  <div class="export-section">
-    <label for="exportTimeRange">Export Sessions:</label>
-    <select id="exportTimeRange" bind:value={exportTimeRange}>
-      <option value="7days">Last 7 Days</option>
-      <option value="30days">Last 30 Days</option>
-      <option value="90days">Last 90 Days</option>
-      <option value="1year">Last Year</option>
-      <option value="all">All Sessions</option>
-    </select>
-    <button on:click={handleExport} disabled={exporting || loading} class="btn-export">
-      {exporting ? 'Exporting...' : 'Export CSV'}
+  <div class="table-toolbar">
+    <button
+      on:click={handleAddNew}
+      class="toolbar-btn"
+      title="Add Session"
+      aria-label="Add Session"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
     </button>
+
+    <div class="toolbar-export">
+      <button
+        on:click={toggleExportMenu}
+        class="toolbar-btn"
+        class:active={showExportMenu}
+        title="Export Sessions"
+        aria-label="Export Sessions"
+        disabled={exporting || loading}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </button>
+
+      {#if showExportMenu}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="export-dropdown" on:click|stopPropagation>
+          <button on:click={() => handleExport('7days')} class="export-option">
+            Last 7 Days
+          </button>
+          <button on:click={() => handleExport('30days')} class="export-option">
+            Last 30 Days
+          </button>
+          <button on:click={() => handleExport('90days')} class="export-option">
+            Last 90 Days
+          </button>
+          <button on:click={() => handleExport('1year')} class="export-option">
+            Last Year
+          </button>
+          <button on:click={() => handleExport('all')} class="export-option">
+            All Sessions
+          </button>
+        </div>
+      {/if}
+    </div>
   </div>
 
   {#if loading}
@@ -164,9 +221,6 @@
   }
 
   .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 1rem;
   }
 
@@ -174,22 +228,6 @@
     margin: 0;
     color: var(--color-text);
     font-size: 1.5rem;
-  }
-
-  .btn-primary {
-    padding: 0.5rem 1rem;
-    background-color: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .btn-primary:hover {
-    background-color: var(--color-primary-dark);
   }
 
   .error {
@@ -240,56 +278,89 @@
     color: var(--color-text-secondary);
   }
 
-  .export-section {
+  .table-toolbar {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    padding: 0.75rem;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
     background: var(--color-bg-secondary);
     border-radius: 6px;
+    border: 1px solid var(--color-border);
   }
 
-  .export-section label {
-    font-size: 0.875rem;
-    color: var(--color-text);
-    font-weight: 500;
-  }
-
-  .export-section select {
-    padding: 0.5rem;
+  .toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: var(--color-bg);
     border: 1px solid var(--color-border);
     border-radius: 4px;
-    background: var(--color-bg);
     color: var(--color-text);
-    font-size: 0.875rem;
     cursor: pointer;
+    transition: all 0.2s;
   }
 
-  .export-section select:focus {
-    outline: none;
+  .toolbar-btn:hover:not(:disabled) {
+    background: var(--color-bg-hover);
     border-color: var(--color-primary);
+    color: var(--color-primary);
   }
 
-  .btn-export {
-    padding: 0.5rem 1rem;
-    background-color: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .btn-export:hover:not(:disabled) {
-    background-color: var(--color-primary-dark);
-  }
-
-  .btn-export:disabled {
-    opacity: 0.6;
+  .toolbar-btn:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .toolbar-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+  }
+
+  .toolbar-btn svg {
+    display: block;
+  }
+
+  .toolbar-export {
+    position: relative;
+  }
+
+  .export-dropdown {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    min-width: max-content;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .export-option {
+    display: block;
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    background: none;
+    border: none;
+    text-align: left;
+    font-size: 0.875rem;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .export-option:hover {
+    background: var(--color-bg-hover);
+  }
+
+  .export-option:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
   }
 
   @media (max-width: 768px) {
@@ -297,24 +368,12 @@
       padding: 1rem;
     }
 
-    .header {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: stretch;
-    }
-
     .stats {
       grid-template-columns: 1fr 1fr;
     }
 
-    .export-section {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .export-section select,
-    .btn-export {
-      width: 100%;
+    .table-toolbar {
+      justify-content: flex-start;
     }
   }
 </style>
