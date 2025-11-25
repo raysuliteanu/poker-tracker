@@ -75,6 +75,7 @@ impl PokerTrackerApp {
                                 .wrap(AuthMiddleware)
                                 .route("", web::post().to(poker_session::create_session))
                                 .route("", web::get().to(poker_session::get_sessions))
+                                .route("/export", web::get().to(poker_session::export_sessions))
                                 .route("/{id}", web::get().to(poker_session::get_session))
                                 .route("/{id}", web::put().to(poker_session::update_session))
                                 .route("/{id}", web::delete().to(poker_session::delete_session)),

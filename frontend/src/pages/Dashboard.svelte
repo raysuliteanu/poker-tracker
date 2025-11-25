@@ -10,6 +10,8 @@
   let error = '';
   let showForm = false;
   let editingSession: PokerSession | null = null;
+  let exportTimeRange = 'all';
+  let exporting = false;
 
   onMount(async () => {
     await loadSessions();
@@ -64,6 +66,29 @@
     }
   }
 
+  async function handleExport() {
+    exporting = true;
+    const response = await api.sessions.export(exportTimeRange);
+    exporting = false;
+
+    if (response.error) {
+      alert(response.error);
+      return;
+    }
+
+    if (response.data) {
+      // Create download link
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `poker-sessions-${exportTimeRange}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  }
+
   $: totalProfit = sessions.reduce((sum, s) => sum + (s.profit || 0), 0);
   $: totalSessions = sessions.length;
   $: totalHours = sessions.reduce((sum, s) => sum + s.duration_minutes / 60, 0);
@@ -102,6 +127,20 @@
         ${totalHours > 0 ? (totalProfit / totalHours).toFixed(2) : '0.00'}
       </div>
     </div>
+  </div>
+
+  <div class="export-section">
+    <label for="exportTimeRange">Export Sessions:</label>
+    <select id="exportTimeRange" bind:value={exportTimeRange}>
+      <option value="7days">Last 7 Days</option>
+      <option value="30days">Last 30 Days</option>
+      <option value="90days">Last 90 Days</option>
+      <option value="1year">Last Year</option>
+      <option value="all">All Sessions</option>
+    </select>
+    <button on:click={handleExport} disabled={exporting || loading} class="btn-export">
+      {exporting ? 'Exporting...' : 'Export CSV'}
+    </button>
   </div>
 
   {#if loading}
@@ -201,6 +240,58 @@
     color: var(--color-text-secondary);
   }
 
+  .export-section {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: var(--color-bg-secondary);
+    border-radius: 6px;
+  }
+
+  .export-section label {
+    font-size: 0.875rem;
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .export-section select {
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .export-section select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+  }
+
+  .btn-export {
+    padding: 0.5rem 1rem;
+    background-color: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .btn-export:hover:not(:disabled) {
+    background-color: var(--color-primary-dark);
+  }
+
+  .btn-export:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   @media (max-width: 768px) {
     .dashboard {
       padding: 1rem;
@@ -214,6 +305,16 @@
 
     .stats {
       grid-template-columns: 1fr 1fr;
+    }
+
+    .export-section {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .export-section select,
+    .btn-export {
+      width: 100%;
     }
   }
 </style>

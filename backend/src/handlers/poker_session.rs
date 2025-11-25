@@ -2,6 +2,7 @@ use actix_web::{HttpMessage, HttpRequest, HttpResponse, Responder, web};
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{NaiveDate, Utc};
 use diesel::prelude::*;
+use serde::Deserialize;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -285,5 +286,112 @@ pub async fn delete_session(
         Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to delete session"
         })),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExportQuery {
+    pub time_range: Option<String>,
+}
+
+pub async fn export_sessions(
+    pool: web::Data<DbPool>,
+    req: HttpRequest,
+    query: web::Query<ExportQuery>,
+) -> impl Responder {
+    let user_id = match req.extensions().get::<Uuid>() {
+        Some(id) => *id,
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "Unauthorized"
+            }));
+        }
+    };
+
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(_) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database connection failed"
+            }));
+        }
+    };
+
+    // Calculate cutoff date based on time range
+    let cutoff_date = match query.time_range.as_deref() {
+        Some("7days") => Some(Utc::now().naive_utc().date() - chrono::Duration::days(7)),
+        Some("30days") => Some(Utc::now().naive_utc().date() - chrono::Duration::days(30)),
+        Some("90days") => Some(Utc::now().naive_utc().date() - chrono::Duration::days(90)),
+        Some("1year") => Some(Utc::now().naive_utc().date() - chrono::Duration::days(365)),
+        Some("all") | None => None,
+        Some(_) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Invalid time_range. Valid options: 7days, 30days, 90days, 1year, all"
+            }));
+        }
+    };
+
+    // Query sessions with optional date filter
+    let sessions: Vec<PokerSession> = match cutoff_date {
+        Some(date) => poker_sessions::table
+            .filter(poker_sessions::user_id.eq(user_id))
+            .filter(poker_sessions::session_date.ge(date))
+            .order(poker_sessions::session_date.asc())
+            .load::<PokerSession>(&mut conn),
+        None => poker_sessions::table
+            .filter(poker_sessions::user_id.eq(user_id))
+            .order(poker_sessions::session_date.asc())
+            .load::<PokerSession>(&mut conn),
+    }
+    .unwrap_or_else(|_| vec![]);
+
+    // Generate CSV
+    let csv = generate_csv(&sessions);
+
+    HttpResponse::Ok()
+        .content_type("text/csv; charset=utf-8")
+        .insert_header((
+            "Content-Disposition",
+            format!(
+                "attachment; filename=\"poker-sessions-{}.csv\"",
+                query.time_range.as_deref().unwrap_or("all")
+            ),
+        ))
+        .body(csv)
+}
+
+fn generate_csv(sessions: &[PokerSession]) -> String {
+    let mut csv = String::from("Date,Duration (hours),Buy-in,Rebuy,Cash Out,Profit/Loss,Notes\n");
+
+    for session in sessions {
+        let profit = calculate_profit(
+            &session.buy_in_amount,
+            &session.rebuy_amount,
+            &session.cash_out_amount,
+        );
+        let duration_hours = session.duration_minutes as f64 / 60.0;
+        let notes = session.notes.as_deref().unwrap_or("");
+        let escaped_notes = escape_csv_field(notes);
+
+        csv.push_str(&format!(
+            "{},{:.1},{},{},{},{:.2},{}\n",
+            session.session_date,
+            duration_hours,
+            session.buy_in_amount,
+            session.rebuy_amount,
+            session.cash_out_amount,
+            profit,
+            escaped_notes
+        ));
+    }
+
+    csv
+}
+
+fn escape_csv_field(field: &str) -> String {
+    if field.contains(',') || field.contains('"') || field.contains('\n') {
+        format!("\"{}\"", field.replace('"', "\"\""))
+    } else {
+        field.to_string()
     }
 }

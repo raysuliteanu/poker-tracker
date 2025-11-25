@@ -134,5 +134,31 @@ export const api = {
       apiRequest<{ message: string }>(`/sessions/${id}`, {
         method: 'DELETE',
       }),
+
+    export: async (timeRange: string = 'all'): Promise<ApiResponse<Blob>> => {
+      const token = localStorage.getItem('token');
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/sessions/export?time_range=${timeRange}`,
+          { headers }
+        );
+
+        if (!response.ok) {
+          const data = await response.json();
+          return { error: data.error || 'Failed to export sessions' };
+        }
+
+        const blob = await response.blob();
+        return { data: blob };
+      } catch (error) {
+        return { error: 'Network error. Please try again.' };
+      }
+    },
   },
 };

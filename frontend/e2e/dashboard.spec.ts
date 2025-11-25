@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'fs/promises';
 
 /**
  * Helper function to log in a user for dashboard tests.
@@ -658,5 +659,75 @@ test.describe('Dashboard - Stats Display', () => {
     // This shouldn't normally happen, but test the edge case
     // Dashboard should show $0.00 when no sessions exist (both profit and hourly rate)
     await expect(page.locator('.stat-value').filter({ hasText: '$0.00' })).toHaveCount(2);
+  });
+
+  test('exports sessions to CSV with time range filtering', async ({ page }) => {
+    // Add some sessions with different dates
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 8);
+    const lastMonth = new Date(today);
+    lastMonth.setDate(lastMonth.getDate() - 35);
+
+    // Add session from last month
+    await addSession(page, {
+      date: lastMonth.toISOString().split('T')[0],
+      duration: 3,
+      buyIn: 100,
+      rebuy: 0,
+      cashOut: 150,
+      notes: 'Old session',
+    });
+
+    // Add session from last week
+    await addSession(page, {
+      date: lastWeek.toISOString().split('T')[0],
+      duration: 2,
+      buyIn: 100,
+      rebuy: 50,
+      cashOut: 200,
+      notes: 'Week old session',
+    });
+
+    // Add recent session
+    await addSession(page, {
+      date: yesterday.toISOString().split('T')[0],
+      duration: 2.5,
+      buyIn: 200,
+      rebuy: 0,
+      cashOut: 300,
+      notes: 'Recent session, with comma',
+    });
+
+    // Verify export section is visible
+    await expect(page.getByLabel('Export Sessions:')).toBeVisible();
+    await expect(page.locator('select#exportTimeRange')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+
+    // Test export with "all" time range (default)
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    const download = await downloadPromise;
+
+    // Verify filename
+    expect(download.suggestedFilename()).toBe('poker-sessions-all.csv');
+
+    // Verify CSV content
+    const downloadPath = await download.path();
+    const csvContent = downloadPath ? await readFile(downloadPath, 'utf-8') : '';
+
+    // Check headers
+    expect(csvContent).toContain('Date,Duration (hours),Buy-in,Rebuy,Cash Out,Profit/Loss,Notes');
+
+    // Check all three sessions are included
+    expect(csvContent).toContain('Old session');
+    expect(csvContent).toContain('Week old session');
+    expect(csvContent).toContain('"Recent session, with comma"'); // Should be quoted due to comma
+
+    // Verify the profit/loss calculation is correct (should be in CSV)
+    expect(csvContent).toContain('50.00'); // First session profit: 150 - 100 = 50
+    expect(csvContent).toContain('100.00'); // Recent session profit: 300 - 200 = 100
   });
 });
