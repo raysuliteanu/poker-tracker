@@ -7,7 +7,7 @@
   const dispatch = createEventDispatcher();
 
   let sessionDate = session?.session_date || new Date().toISOString().split('T')[0];
-  let durationMinutes = session?.duration_minutes || 0;
+  let durationHours = session ? session.duration_minutes / 60 : 0;
   let buyInAmount = session ? parseFloat(session.buy_in_amount) : 0;
   let rebuyAmount = session ? parseFloat(session.rebuy_amount) : 0;
   let cashOutAmount = session ? parseFloat(session.cash_out_amount) : 0;
@@ -19,6 +19,9 @@
   async function handleSubmit() {
     error = '';
     loading = true;
+
+    // Convert hours to minutes for the API
+    const durationMinutes = Math.round(durationHours * 60);
 
     if (session) {
       // Update existing session
@@ -89,13 +92,16 @@
       </div>
 
       <div class="form-group">
-        <label for="durationMinutes">Duration (minutes)</label>
+        <label for="durationHours">Duration (hours)</label>
         <input
-          id="durationMinutes"
+          id="durationHours"
           type="number"
-          bind:value={durationMinutes}
-          min="1"
+          step="0.01"
+          bind:value={durationHours}
+          min="0.01"
+          max="99.99"
           required
+          class="no-spinner"
         />
       </div>
 
@@ -105,10 +111,11 @@
           <input
             id="buyInAmount"
             type="number"
-            step="0.01"
+            step="1"
             bind:value={buyInAmount}
             min="0"
             required
+            class="no-spinner"
           />
         </div>
 
@@ -117,9 +124,10 @@
           <input
             id="rebuyAmount"
             type="number"
-            step="0.01"
+            step="1"
             bind:value={rebuyAmount}
             min="0"
+            class="no-spinner"
           />
         </div>
       </div>
@@ -129,10 +137,11 @@
         <input
           id="cashOutAmount"
           type="number"
-          step="0.01"
+          step="1"
           bind:value={cashOutAmount}
           min="0"
           required
+          class="no-spinner"
         />
       </div>
 
@@ -258,6 +267,17 @@
   textarea:focus {
     outline: none;
     border-color: var(--color-primary);
+  }
+
+  /* Hide spinner arrows for number inputs */
+  input.no-spinner::-webkit-outer-spin-button,
+  input.no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input.no-spinner[type="number"] {
+    -moz-appearance: textfield;
   }
 
   textarea {

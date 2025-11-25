@@ -49,7 +49,7 @@ describe('SessionForm', () => {
     render(SessionForm);
 
     expect(screen.getByLabelText('Session Date')).toBeInTheDocument();
-    expect(screen.getByLabelText('Duration (minutes)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Duration (hours)')).toBeInTheDocument();
     expect(screen.getByLabelText('Buy-in ($)')).toBeInTheDocument();
     expect(screen.getByLabelText('Rebuy ($)')).toBeInTheDocument();
     expect(screen.getByLabelText('Cash Out ($)')).toBeInTheDocument();
@@ -67,11 +67,11 @@ describe('SessionForm', () => {
     render(SessionForm, { props: { session: mockSessions[0] } });
 
     const dateInput = screen.getByLabelText('Session Date') as HTMLInputElement;
-    const durationInput = screen.getByLabelText('Duration (minutes)') as HTMLInputElement;
+    const durationInput = screen.getByLabelText('Duration (hours)') as HTMLInputElement;
     const buyInInput = screen.getByLabelText('Buy-in ($)') as HTMLInputElement;
 
     expect(dateInput.value).toBe('2024-01-15');
-    expect(durationInput.value).toBe('120');
+    expect(durationInput.value).toBe('2'); // 120 minutes = 2 hours
     expect(buyInInput.value).toBe('100');
   });
 
@@ -109,12 +109,12 @@ describe('SessionForm', () => {
 
     // Fill in required fields
     const dateInput = screen.getByLabelText('Session Date');
-    const durationInput = screen.getByLabelText('Duration (minutes)');
+    const durationInput = screen.getByLabelText('Duration (hours)');
     const buyInInput = screen.getByLabelText('Buy-in ($)');
     const cashOutInput = screen.getByLabelText('Cash Out ($)');
 
     await fireEvent.input(dateInput, { target: { value: '2024-02-01' } });
-    await fireEvent.input(durationInput, { target: { value: '60' } });
+    await fireEvent.input(durationInput, { target: { value: '1' } }); // 1 hour
     await fireEvent.input(buyInInput, { target: { value: '100' } });
     await fireEvent.input(cashOutInput, { target: { value: '200' } });
 
@@ -131,8 +131,8 @@ describe('SessionForm', () => {
     render(SessionForm, { props: { session: mockSessions[0] } });
 
     // Modify a field
-    const durationInput = screen.getByLabelText('Duration (minutes)');
-    await fireEvent.input(durationInput, { target: { value: '180' } });
+    const durationInput = screen.getByLabelText('Duration (hours)');
+    await fireEvent.input(durationInput, { target: { value: '3' } }); // 3 hours
 
     // Submit form
     const submitButton = screen.getByText('Save Session');
@@ -148,12 +148,12 @@ describe('SessionForm', () => {
 
     // Fill in required fields
     const dateInput = screen.getByLabelText('Session Date');
-    const durationInput = screen.getByLabelText('Duration (minutes)');
+    const durationInput = screen.getByLabelText('Duration (hours)');
     const buyInInput = screen.getByLabelText('Buy-in ($)');
     const cashOutInput = screen.getByLabelText('Cash Out ($)');
 
     await fireEvent.input(dateInput, { target: { value: '2024-02-01' } });
-    await fireEvent.input(durationInput, { target: { value: '60' } });
+    await fireEvent.input(durationInput, { target: { value: '1' } }); // 1 hour
     await fireEvent.input(buyInInput, { target: { value: '100' } });
     await fireEvent.input(cashOutInput, { target: { value: '200' } });
 
@@ -174,12 +174,12 @@ describe('SessionForm', () => {
 
     // Fill in required fields
     const dateInput = screen.getByLabelText('Session Date');
-    const durationInput = screen.getByLabelText('Duration (minutes)');
+    const durationInput = screen.getByLabelText('Duration (hours)');
     const buyInInput = screen.getByLabelText('Buy-in ($)');
     const cashOutInput = screen.getByLabelText('Cash Out ($)');
 
     await fireEvent.input(dateInput, { target: { value: '2024-02-01' } });
-    await fireEvent.input(durationInput, { target: { value: '60' } });
+    await fireEvent.input(durationInput, { target: { value: '1' } }); // 1 hour
     await fireEvent.input(buyInInput, { target: { value: '100' } });
     await fireEvent.input(cashOutInput, { target: { value: '200' } });
 
@@ -188,5 +188,33 @@ describe('SessionForm', () => {
     await fireEvent.click(submitButton);
 
     expect(screen.getByText('Saving...')).toBeInTheDocument();
+  });
+
+  it('enforces whole dollar amounts for money inputs', () => {
+    render(SessionForm);
+
+    const buyInInput = screen.getByLabelText('Buy-in ($)') as HTMLInputElement;
+    const rebuyInput = screen.getByLabelText('Rebuy ($)') as HTMLInputElement;
+    const cashOutInput = screen.getByLabelText('Cash Out ($)') as HTMLInputElement;
+
+    // Verify step is set to 1 (whole dollars only)
+    expect(buyInInput.step).toBe('1');
+    expect(rebuyInput.step).toBe('1');
+    expect(cashOutInput.step).toBe('1');
+
+    // Verify no-spinner class is applied
+    expect(buyInInput.classList.contains('no-spinner')).toBe(true);
+    expect(rebuyInput.classList.contains('no-spinner')).toBe(true);
+    expect(cashOutInput.classList.contains('no-spinner')).toBe(true);
+  });
+
+  it('enforces decimal hours with step 0.01', () => {
+    render(SessionForm);
+
+    const durationInput = screen.getByLabelText('Duration (hours)') as HTMLInputElement;
+
+    // Verify step is set to 0.01 (allows decimals like 2.5)
+    expect(durationInput.step).toBe('0.01');
+    expect(durationInput.classList.contains('no-spinner')).toBe(true);
   });
 });

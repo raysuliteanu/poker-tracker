@@ -42,12 +42,12 @@ describe('SessionTable', () => {
   it('formats duration correctly', () => {
     render(SessionTable, { props: { sessions: mockSessions } });
 
-    // 120 minutes = 2h 0m
-    expect(screen.getByText('2h 0m')).toBeInTheDocument();
-    // 180 minutes = 3h 0m
-    expect(screen.getByText('3h 0m')).toBeInTheDocument();
-    // 90 minutes = 1h 30m
-    expect(screen.getByText('1h 30m')).toBeInTheDocument();
+    // 120 minutes = 2.0h
+    expect(screen.getByText('2.0h')).toBeInTheDocument();
+    // 180 minutes = 3.0h
+    expect(screen.getByText('3.0h')).toBeInTheDocument();
+    // 90 minutes = 1.5h
+    expect(screen.getByText('1.5h')).toBeInTheDocument();
   });
 
   it('formats money values correctly', () => {

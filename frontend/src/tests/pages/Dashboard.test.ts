@@ -102,7 +102,7 @@ describe('Dashboard', () => {
     await waitFor(() => {
       // Hourly Rate = 100 / 6.5 = ~15.38
       expect(screen.getByText('Hourly Rate')).toBeInTheDocument();
-      expect(screen.getByText('$15.38/hr')).toBeInTheDocument();
+      expect(screen.getByText('$15.38')).toBeInTheDocument();
     });
   });
 
@@ -125,9 +125,9 @@ describe('Dashboard', () => {
     render(Dashboard);
 
     await waitFor(() => {
-      expect(screen.getByText('$0.00')).toBeInTheDocument();
-      expect(screen.getByText('0')).toBeInTheDocument();
-      expect(screen.getByText('0.0')).toBeInTheDocument();
+      expect(screen.getAllByText('$0.00')).toHaveLength(2); // Profit/Loss and Hourly Rate
+      expect(screen.getByText('0')).toBeInTheDocument(); // Total Sessions
+      expect(screen.getByText('0.0')).toBeInTheDocument(); // Total Hours
     });
   });
 

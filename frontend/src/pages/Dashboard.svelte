@@ -99,7 +99,7 @@
     <div class="stat-card">
       <div class="stat-label">Hourly Rate</div>
       <div class="stat-value">
-        ${totalHours > 0 ? (totalProfit / totalHours).toFixed(2) : '0.00'}/hr
+        ${totalHours > 0 ? (totalProfit / totalHours).toFixed(2) : '0.00'}
       </div>
     </div>
   </div>

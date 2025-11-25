@@ -39,7 +39,7 @@ async function addSession(
   page: any,
   sessionData: {
     date: string;
-    duration: number;
+    duration: number; // in hours
     buyIn: number;
     rebuy: number;
     cashOut: number;
@@ -50,7 +50,7 @@ async function addSession(
   await expect(page.getByRole('heading', { name: 'Add New Session' })).toBeVisible();
 
   await page.getByLabel('Session Date').fill(sessionData.date);
-  await page.getByLabel('Duration (minutes)').fill(sessionData.duration.toString());
+  await page.getByLabel('Duration (hours)').fill(sessionData.duration.toString());
   await page.getByLabel('Buy-in ($)').fill(sessionData.buyIn.toString());
   await page.getByLabel('Rebuy ($)').fill(sessionData.rebuy.toString());
   await page.getByLabel('Cash Out ($)').fill(sessionData.cashOut.toString());
@@ -89,7 +89,7 @@ test.describe('Dashboard - Poker Sessions', () => {
     // Form should be visible
     await expect(page.getByRole('heading', { name: 'Add New Session' })).toBeVisible();
     await expect(page.getByLabel('Session Date')).toBeVisible();
-    await expect(page.getByLabel('Duration (minutes)')).toBeVisible();
+    await expect(page.getByLabel('Duration (hours)')).toBeVisible();
     await expect(page.getByLabel('Buy-in ($)')).toBeVisible();
     await expect(page.getByLabel('Rebuy ($)')).toBeVisible();
     await expect(page.getByLabel('Cash Out ($)')).toBeVisible();
@@ -109,9 +109,29 @@ test.describe('Dashboard - Poker Sessions', () => {
     await expect(page.getByRole('heading', { name: 'Add New Session' })).not.toBeVisible();
   });
 
+  test('money inputs accept only whole dollars', async ({ page }) => {
+    await page.getByRole('button', { name: 'Add Session' }).click();
+
+    // Check buy-in input
+    const buyInInput = page.getByLabel('Buy-in ($)');
+    await expect(buyInInput).toHaveAttribute('step', '1');
+
+    // Check rebuy input
+    const rebuyInput = page.getByLabel('Rebuy ($)');
+    await expect(rebuyInput).toHaveAttribute('step', '1');
+
+    // Check cash out input
+    const cashOutInput = page.getByLabel('Cash Out ($)');
+    await expect(cashOutInput).toHaveAttribute('step', '1');
+
+    // Verify duration allows decimals
+    const durationInput = page.getByLabel('Duration (hours)');
+    await expect(durationInput).toHaveAttribute('step', '0.01');
+  });
+
   test('successfully adds a winning poker session', async ({ page }) => {
     const sessionDate = '2024-01-15';
-    const duration = 180; // 3 hours
+    const duration = 3; // 3 hours
     const buyIn = 100;
     const rebuy = 50;
     const cashOut = 300;
@@ -142,12 +162,12 @@ test.describe('Dashboard - Poker Sessions', () => {
     await expect(page.locator('.stat-value.profit')).toContainText('$150.00'); // Total profit
     await expect(page.locator('.stat-value').filter({ hasText: /^1$/ })).toBeVisible(); // Total sessions
     await expect(page.locator('.stat-value').filter({ hasText: '3.0' })).toBeVisible(); // Total hours
-    await expect(page.locator('.stat-value').filter({ hasText: '$50.00/hr' })).toBeVisible(); // Hourly rate
+    await expect(page.locator('.stat-value').filter({ hasText: '$50.00' })).toBeVisible(); // Hourly rate
   });
 
   test('successfully adds a losing poker session', async ({ page }) => {
     const sessionDate = '2024-01-20';
-    const duration = 120; // 2 hours
+    const duration = 2; // 2 hours
     const buyIn = 200;
     const rebuy = 100;
     const cashOut = 150;
@@ -172,7 +192,7 @@ test.describe('Dashboard - Poker Sessions', () => {
     // Session 1: Win $100 in 2 hours
     await addSession(page, {
       date: '2024-01-10',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -181,7 +201,7 @@ test.describe('Dashboard - Poker Sessions', () => {
     // Session 2: Lose $50 in 1 hour
     await addSession(page, {
       date: '2024-01-11',
-      duration: 60,
+      duration: 1,
       buyIn: 100,
       rebuy: 0,
       cashOut: 50,
@@ -190,17 +210,17 @@ test.describe('Dashboard - Poker Sessions', () => {
     // Session 3: Win $200 in 3 hours
     await addSession(page, {
       date: '2024-01-12',
-      duration: 180,
+      duration: 3,
       buyIn: 100,
       rebuy: 50,
       cashOut: 350,
     });
 
-    // Total: +$100 -$50 +$200 = +$250 over 6 hours = $41.67/hr
+    // Total: +$100 -$50 +$200 = +$250 over 6 hours = $41.67
     await expect(page.locator('.stat-value.profit')).toContainText('$250.00'); // Total profit
     await expect(page.locator('.stat-value').filter({ hasText: /^3$/ })).toBeVisible(); // Total sessions
     await expect(page.locator('.stat-value').filter({ hasText: '6.0' })).toBeVisible(); // Total hours
-    await expect(page.locator('.stat-value').filter({ hasText: '$41.67/hr' })).toBeVisible(); // Hourly rate
+    await expect(page.locator('.stat-value').filter({ hasText: '$41.67' })).toBeVisible(); // Hourly rate
   });
 
   test('validates required fields when adding session', async ({ page }) => {
@@ -216,7 +236,7 @@ test.describe('Dashboard - Poker Sessions', () => {
   test('adds session with zero rebuy', async ({ page }) => {
     await addSession(page, {
       date: '2024-01-15',
-      duration: 60,
+      duration: 1,
       buyIn: 100,
       rebuy: 0,
       cashOut: 150,
@@ -233,7 +253,7 @@ test.describe('Dashboard - Edit Sessions', () => {
     // Add an initial session to edit
     await addSession(page, {
       date: '2024-01-15',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 50,
       cashOut: 200,
@@ -250,7 +270,7 @@ test.describe('Dashboard - Edit Sessions', () => {
 
     // Verify fields are pre-filled with existing data
     await expect(page.getByLabel('Session Date')).toHaveValue('2024-01-15');
-    await expect(page.getByLabel('Duration (minutes)')).toHaveValue('120');
+    await expect(page.getByLabel('Duration (hours)')).toHaveValue('2');
     await expect(page.getByLabel('Buy-in ($)')).toHaveValue('100');
     await expect(page.getByLabel('Rebuy ($)')).toHaveValue('50');
     await expect(page.getByLabel('Cash Out ($)')).toHaveValue('200');
@@ -261,8 +281,8 @@ test.describe('Dashboard - Edit Sessions', () => {
     // Click edit button
     await page.locator('button[aria-label="Edit session"]').first().click();
 
-    // Modify the session
-    await page.getByLabel('Duration (minutes)').fill('180'); // Change from 120 to 180
+    // Modify the session - use partial hours to test decimal support
+    await page.getByLabel('Duration (hours)').fill('2.5'); // Change from 2 to 2.5 hours (150 minutes)
     await page.getByLabel('Cash Out ($)').fill('300'); // Change from 200 to 300
     await page.getByLabel('Notes (optional)').fill('Updated notes after edit');
 
@@ -279,9 +299,9 @@ test.describe('Dashboard - Edit Sessions', () => {
     await expect(page.getByText('Updated notes after edit')).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
 
-    // Verify stats updated correctly (3 hours now instead of 2)
-    await expect(page.getByText('3.0')).toBeVisible(); // Total hours
-    await expect(page.getByText('$50.00/hr')).toBeVisible(); // Updated hourly rate
+    // Verify stats updated correctly (2.5 hours now instead of 2)
+    await expect(page.locator('.stat-value').filter({ hasText: '2.5' })).toBeVisible(); // Total hours
+    await expect(page.locator('.stat-value').filter({ hasText: '$60.00' })).toBeVisible(); // Updated hourly rate: 150/2.5 = 60
   });
 
   test('cancels edit without saving changes', async ({ page }) => {
@@ -336,7 +356,7 @@ test.describe('Dashboard - Delete Sessions', () => {
     // Add a session to delete
     await addSession(page, {
       date: '2024-01-15',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -394,7 +414,7 @@ test.describe('Dashboard - Notes Functionality', () => {
     // Add session with notes
     await addSession(page, {
       date: '2024-01-10',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -404,7 +424,7 @@ test.describe('Dashboard - Notes Functionality', () => {
     // Add session without notes
     await addSession(page, {
       date: '2024-01-11',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -420,7 +440,7 @@ test.describe('Dashboard - Notes Functionality', () => {
 
     await addSession(page, {
       date: '2024-01-10',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -439,7 +459,7 @@ test.describe('Dashboard - Notes Functionality', () => {
   test('closes notes modal when close button is clicked', async ({ page }) => {
     await addSession(page, {
       date: '2024-01-10',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -458,7 +478,7 @@ test.describe('Dashboard - Notes Functionality', () => {
   test('closes notes modal when clicking overlay', async ({ page }) => {
     await addSession(page, {
       date: '2024-01-10',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -477,7 +497,7 @@ test.describe('Dashboard - Notes Functionality', () => {
   test('closes notes modal with Escape key', async ({ page }) => {
     await addSession(page, {
       date: '2024-01-10',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -496,7 +516,7 @@ test.describe('Dashboard - Notes Functionality', () => {
   test('displays session date in modal header', async ({ page }) => {
     await addSession(page, {
       date: '2024-01-15',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -551,7 +571,7 @@ test.describe('Dashboard - Charts Navigation', () => {
     // Add sessions
     await addSession(page, {
       date: '2024-01-15',
-      duration: 120,
+      duration: 2,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -575,7 +595,7 @@ test.describe('Dashboard - Stats Display', () => {
     // Add 3 sessions with known values
     await addSession(page, {
       date: '2024-01-10',
-      duration: 120, // 2 hours
+      duration: 2, // 2 hours
       buyIn: 100,
       rebuy: 0,
       cashOut: 200, // +$100
@@ -583,7 +603,7 @@ test.describe('Dashboard - Stats Display', () => {
 
     await addSession(page, {
       date: '2024-01-11',
-      duration: 180, // 3 hours
+      duration: 3, // 3 hours
       buyIn: 200,
       rebuy: 100,
       cashOut: 150, // -$150
@@ -591,7 +611,7 @@ test.describe('Dashboard - Stats Display', () => {
 
     await addSession(page, {
       date: '2024-01-12',
-      duration: 240, // 4 hours
+      duration: 4, // 4 hours
       buyIn: 100,
       rebuy: 0,
       cashOut: 300, // +$200
@@ -599,20 +619,20 @@ test.describe('Dashboard - Stats Display', () => {
 
     // Total: +$100 -$150 +$200 = +$150
     // Hours: 2 + 3 + 4 = 9 hours
-    // Hourly: $150 / 9 = $16.67/hr
+    // Hourly: $150 / 9 = $16.67
     // Sessions: 3
 
     await expect(page.locator('.stat-value.profit')).toContainText('$150.00');
     await expect(page.locator('.stat-value').filter({ hasText: /^3$/ })).toBeVisible();
     await expect(page.locator('.stat-value').filter({ hasText: '9.0' })).toBeVisible();
-    await expect(page.locator('.stat-value').filter({ hasText: '$16.67/hr' })).toBeVisible();
+    await expect(page.locator('.stat-value').filter({ hasText: '$16.67' })).toBeVisible();
   });
 
   test('displays profit in green and loss in red', async ({ page }) => {
     // Add winning session
     await addSession(page, {
       date: '2024-01-10',
-      duration: 60,
+      duration: 1,
       buyIn: 100,
       rebuy: 0,
       cashOut: 200,
@@ -624,7 +644,7 @@ test.describe('Dashboard - Stats Display', () => {
     // Now add a larger losing session to make total negative
     await addSession(page, {
       date: '2024-01-11',
-      duration: 60,
+      duration: 1,
       buyIn: 200,
       rebuy: 100,
       cashOut: 50,
@@ -636,7 +656,7 @@ test.describe('Dashboard - Stats Display', () => {
 
   test('handles zero hours edge case for hourly rate', async ({ page }) => {
     // This shouldn't normally happen, but test the edge case
-    // Dashboard should show $0.00/hr when no sessions exist
-    await expect(page.getByText('$0.00/hr')).toBeVisible();
+    // Dashboard should show $0.00 when no sessions exist (both profit and hourly rate)
+    await expect(page.locator('.stat-value').filter({ hasText: '$0.00' })).toHaveCount(2);
   });
 });
