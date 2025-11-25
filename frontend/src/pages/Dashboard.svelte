@@ -14,8 +14,11 @@
   let exporting = false;
   let showExportMenu = false;
 
-  onMount(async () => {
-    await loadSessions();
+  onMount(() => {
+    const init = async () => {
+      await loadSessions();
+    };
+    init();
 
     // Add global click handler for closing export menu
     document.addEventListener('click', handleClickOutside);
