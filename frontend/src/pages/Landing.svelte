@@ -43,9 +43,10 @@
   .landing-container {
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 2rem;
+    padding: 2rem 2rem 2rem 2rem;
+    padding-top: 1rem;
     background: var(--color-bg);
     width: 100%;
   }
@@ -56,7 +57,7 @@
   }
 
   .hero {
-    margin-bottom: 3rem;
+    margin-bottom: 2rem;
   }
 
   h1 {
@@ -76,8 +77,8 @@
   .features {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 2rem;
-    margin-bottom: 3rem;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
   }
 
   .feature {
