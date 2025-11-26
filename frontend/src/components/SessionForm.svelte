@@ -277,6 +277,7 @@
   }
 
   input.no-spinner[type="number"] {
+    appearance: textfield;
     -moz-appearance: textfield;
   }
 

@@ -182,7 +182,7 @@
 
       {#if showExportMenu}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="export-dropdown" on:click|stopPropagation>
+        <div class="export-dropdown" on:click|stopPropagation on:keydown|stopPropagation>
           <button on:click={() => handleExport('7days')} class="export-option">
             Last 7 Days
           </button>
