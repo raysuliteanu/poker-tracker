@@ -395,3 +395,212 @@ fn escape_csv_field(field: &str) -> String {
         field.to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bigdecimal::FromPrimitive;
+    use chrono::{NaiveDate, Utc};
+
+    // CSV field escaping tests
+    #[test]
+    fn test_escape_csv_field_no_escaping_needed() {
+        let field = "Simple text";
+        let result = escape_csv_field(field);
+        assert_eq!(result, "Simple text");
+    }
+
+    #[test]
+    fn test_escape_csv_field_with_comma() {
+        let field = "Text, with comma";
+        let result = escape_csv_field(field);
+        assert_eq!(result, "\"Text, with comma\"");
+    }
+
+    #[test]
+    fn test_escape_csv_field_with_quotes() {
+        let field = "Text with \"quotes\"";
+        let result = escape_csv_field(field);
+        assert_eq!(result, "\"Text with \"\"quotes\"\"\"");
+    }
+
+    #[test]
+    fn test_escape_csv_field_with_newline() {
+        let field = "Text with\nnewline";
+        let result = escape_csv_field(field);
+        assert_eq!(result, "\"Text with\nnewline\"");
+    }
+
+    #[test]
+    fn test_escape_csv_field_empty() {
+        let field = "";
+        let result = escape_csv_field(field);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_escape_csv_field_multiple_special_chars() {
+        let field = "Text, with \"quotes\" and\nnewlines";
+        let result = escape_csv_field(field);
+        assert_eq!(result, "\"Text, with \"\"quotes\"\" and\nnewlines\"");
+    }
+
+    // CSV generation tests
+    #[test]
+    fn test_generate_csv_empty() {
+        let sessions: Vec<PokerSession> = vec![];
+        let csv = generate_csv(&sessions);
+        assert_eq!(
+            csv,
+            "Date,Duration (hours),Buy-in,Rebuy,Cash Out,Profit/Loss,Notes\n"
+        );
+    }
+
+    #[test]
+    fn test_generate_csv_single_session() {
+        let session = PokerSession {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            session_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+            duration_minutes: 120,
+            buy_in_amount: BigDecimal::from_f64(100.0).unwrap(),
+            rebuy_amount: BigDecimal::from_f64(50.0).unwrap(),
+            cash_out_amount: BigDecimal::from_f64(200.0).unwrap(),
+            notes: Some("Good session".to_string()),
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        let csv = generate_csv(&[session]);
+        let lines: Vec<&str> = csv.lines().collect();
+
+        assert_eq!(lines.len(), 2); // header + 1 data row
+        assert_eq!(
+            lines[0],
+            "Date,Duration (hours),Buy-in,Rebuy,Cash Out,Profit/Loss,Notes"
+        );
+        assert!(lines[1].contains("2024-01-15"));
+        assert!(lines[1].contains("2.0")); // 120 minutes = 2.0 hours
+        assert!(lines[1].contains("100"));
+        assert!(lines[1].contains("50"));
+        assert!(lines[1].contains("200"));
+        assert!(lines[1].contains("50.00")); // profit
+        assert!(lines[1].contains("Good session"));
+    }
+
+    #[test]
+    fn test_generate_csv_multiple_sessions() {
+        let sessions = vec![
+            PokerSession {
+                id: Uuid::new_v4(),
+                user_id: Uuid::new_v4(),
+                session_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+                duration_minutes: 120,
+                buy_in_amount: BigDecimal::from_f64(100.0).unwrap(),
+                rebuy_amount: BigDecimal::from_f64(0.0).unwrap(),
+                cash_out_amount: BigDecimal::from_f64(150.0).unwrap(),
+                notes: None,
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+            },
+            PokerSession {
+                id: Uuid::new_v4(),
+                user_id: Uuid::new_v4(),
+                session_date: NaiveDate::from_ymd_opt(2024, 1, 16).unwrap(),
+                duration_minutes: 180,
+                buy_in_amount: BigDecimal::from_f64(200.0).unwrap(),
+                rebuy_amount: BigDecimal::from_f64(100.0).unwrap(),
+                cash_out_amount: BigDecimal::from_f64(250.0).unwrap(),
+                notes: Some("Lost session".to_string()),
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+            },
+        ];
+
+        let csv = generate_csv(&sessions);
+        let lines: Vec<&str> = csv.lines().collect();
+
+        assert_eq!(lines.len(), 3); // header + 2 data rows
+    }
+
+    #[test]
+    fn test_generate_csv_with_special_chars_in_notes() {
+        let session = PokerSession {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            session_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+            duration_minutes: 60,
+            buy_in_amount: BigDecimal::from_f64(100.0).unwrap(),
+            rebuy_amount: BigDecimal::from_f64(0.0).unwrap(),
+            cash_out_amount: BigDecimal::from_f64(100.0).unwrap(),
+            notes: Some("Notes with, comma and \"quotes\"".to_string()),
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        let csv = generate_csv(&[session]);
+        let lines: Vec<&str> = csv.lines().collect();
+
+        // The notes field should be escaped with quotes
+        assert!(lines[1].contains("\"Notes with, comma and \"\"quotes\"\"\""));
+    }
+
+    #[test]
+    fn test_generate_csv_negative_profit() {
+        let session = PokerSession {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            session_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+            duration_minutes: 90,
+            buy_in_amount: BigDecimal::from_f64(200.0).unwrap(),
+            rebuy_amount: BigDecimal::from_f64(100.0).unwrap(),
+            cash_out_amount: BigDecimal::from_f64(200.0).unwrap(),
+            notes: None,
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        let csv = generate_csv(&[session]);
+        let lines: Vec<&str> = csv.lines().collect();
+
+        // Should show -100.00 profit
+        assert!(lines[1].contains("-100.00"));
+    }
+
+    #[test]
+    fn test_generate_csv_duration_conversion() {
+        // Test various duration conversions to hours
+        let test_cases = vec![
+            (60, "1.0"),   // 60 minutes = 1.0 hour
+            (90, "1.5"),   // 90 minutes = 1.5 hours
+            (120, "2.0"),  // 120 minutes = 2.0 hours
+            (45, "0.8"),   // 45 minutes = 0.75 hours (rounded to 0.8)
+            (1, "0.0"),    // 1 minute = 0.0 hours (rounded)
+        ];
+
+        for (minutes, expected_hours) in test_cases {
+            let session = PokerSession {
+                id: Uuid::new_v4(),
+                user_id: Uuid::new_v4(),
+                session_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+                duration_minutes: minutes,
+                buy_in_amount: BigDecimal::from_f64(100.0).unwrap(),
+                rebuy_amount: BigDecimal::from_f64(0.0).unwrap(),
+                cash_out_amount: BigDecimal::from_f64(100.0).unwrap(),
+                notes: None,
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+            };
+
+            let csv = generate_csv(&[session]);
+            let lines: Vec<&str> = csv.lines().collect();
+            assert!(
+                lines[1].contains(expected_hours),
+                "Expected {} hours for {} minutes, got: {}",
+                expected_hours,
+                minutes,
+                lines[1]
+            );
+        }
+    }
+}
