@@ -1,20 +1,38 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { api, type PokerSession } from '../lib/api';
 
   export let session: PokerSession | null = null;
 
   const dispatch = createEventDispatcher();
 
-  let sessionDate = session?.session_date || new Date().toISOString().split('T')[0];
-  let durationHours = session ? session.duration_minutes / 60 : 0;
-  let buyInAmount = session ? parseFloat(session.buy_in_amount) : 0;
-  let rebuyAmount = session ? parseFloat(session.rebuy_amount) : 0;
-  let cashOutAmount = session ? parseFloat(session.cash_out_amount) : 0;
-  let notes = session?.notes || '';
+  // Initial values for dirty tracking
+  const initialSessionDate = session?.session_date || new Date().toISOString().split('T')[0];
+  const initialDurationHours = session ? session.duration_minutes / 60 : 0;
+  const initialBuyInAmount = session ? parseFloat(session.buy_in_amount) : 0;
+  const initialRebuyAmount = session ? parseFloat(session.rebuy_amount) : 0;
+  const initialCashOutAmount = session ? parseFloat(session.cash_out_amount) : 0;
+  const initialNotes = session?.notes || '';
+
+  let sessionDate = initialSessionDate;
+  let durationHours = initialDurationHours;
+  let buyInAmount = initialBuyInAmount;
+  let rebuyAmount = initialRebuyAmount;
+  let cashOutAmount = initialCashOutAmount;
+  let notes = initialNotes;
 
   let error = '';
   let loading = false;
+  let showConfirmDialog = false;
+
+  // Check if form is dirty (has unsaved changes)
+  $: isDirty =
+    sessionDate !== initialSessionDate ||
+    String(durationHours) !== String(initialDurationHours) ||
+    String(buyInAmount) !== String(initialBuyInAmount) ||
+    String(rebuyAmount) !== String(initialRebuyAmount) ||
+    String(cashOutAmount) !== String(initialCashOutAmount) ||
+    notes !== initialNotes;
 
   async function handleSubmit() {
     error = '';
@@ -63,8 +81,36 @@
   }
 
   function handleCancel() {
+    if (isDirty) {
+      showConfirmDialog = true;
+    } else {
+      dispatch('cancel');
+    }
+  }
+
+  function handleConfirmCancel() {
+    showConfirmDialog = false;
     dispatch('cancel');
   }
+
+  function handleConfirmStay() {
+    showConfirmDialog = false;
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && !showConfirmDialog) {
+      event.preventDefault();
+      handleCancel();
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener('keydown', handleKeydown);
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('keydown', handleKeydown);
+  });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -166,6 +212,25 @@
     </form>
   </div>
 </div>
+
+{#if showConfirmDialog}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="confirm-overlay" on:click={handleConfirmStay}>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="confirm-dialog" role="dialog" aria-modal="true" tabindex="-1" on:click|stopPropagation>
+      <h3>Unsaved Changes</h3>
+      <p>You have unsaved changes. Are you sure you want to close this dialog?</p>
+      <div class="confirm-actions">
+        <button on:click={handleConfirmStay} class="btn-primary" data-default="true">
+          Cancel
+        </button>
+        <button on:click={handleConfirmCancel} class="btn-secondary">
+          Continue
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .modal-overlay {
@@ -323,6 +388,46 @@
 
   .btn-secondary:hover {
     background-color: var(--color-bg-hover);
+  }
+
+  .confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    padding: 1rem;
+  }
+
+  .confirm-dialog {
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    padding: 2rem;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .confirm-dialog h3 {
+    margin: 0 0 1rem 0;
+    color: var(--color-text);
+  }
+
+  .confirm-dialog p {
+    margin: 0 0 1.5rem 0;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  .confirm-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
   }
 
   @media (max-width: 768px) {
