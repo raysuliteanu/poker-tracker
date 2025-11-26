@@ -571,11 +571,11 @@ mod tests {
     fn test_generate_csv_duration_conversion() {
         // Test various duration conversions to hours
         let test_cases = vec![
-            (60, "1.0"),   // 60 minutes = 1.0 hour
-            (90, "1.5"),   // 90 minutes = 1.5 hours
-            (120, "2.0"),  // 120 minutes = 2.0 hours
-            (45, "0.8"),   // 45 minutes = 0.75 hours (rounded to 0.8)
-            (1, "0.0"),    // 1 minute = 0.0 hours (rounded)
+            (60, "1.0"),  // 60 minutes = 1.0 hour
+            (90, "1.5"),  // 90 minutes = 1.5 hours
+            (120, "2.0"), // 120 minutes = 2.0 hours
+            (45, "0.8"),  // 45 minutes = 0.75 hours (rounded to 0.8)
+            (1, "0.0"),   // 1 minute = 0.0 hours (rounded)
         ];
 
         for (minutes, expected_hours) in test_cases {
