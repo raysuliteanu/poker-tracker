@@ -547,6 +547,9 @@ test.describe('Dashboard - Charts Navigation', () => {
     // Should be on dashboard initially
     await expect(page.getByRole('link', { name: 'Poker Bankroll Tracker' })).toBeVisible();
 
+    // Wait for Dashboard to fully load
+    await expect(page.getByLabel('Add Session')).toBeVisible();
+
     // Click Charts link in navbar
     await page.getByRole('link', { name: 'Charts' }).click();
 
@@ -556,6 +559,9 @@ test.describe('Dashboard - Charts Navigation', () => {
   });
 
   test('charts page displays heading', async ({ page }) => {
+    // Wait for Dashboard to fully load
+    await expect(page.getByLabel('Add Session')).toBeVisible();
+
     // Navigate to Charts
     await page.getByRole('link', { name: 'Charts' }).click();
     await page.waitForURL(/#\/charts/);
@@ -565,7 +571,10 @@ test.describe('Dashboard - Charts Navigation', () => {
   });
 
   test('charts page shows empty state when no sessions', async ({ page }) => {
-    // Navigate to Charts immediately (no sessions added)
+    // Wait for Dashboard to fully load
+    await expect(page.getByLabel('Add Session')).toBeVisible();
+
+    // Navigate to Charts (no sessions added)
     await page.getByRole('link', { name: 'Charts' }).click();
     await page.waitForURL(/#\/charts/);
 
