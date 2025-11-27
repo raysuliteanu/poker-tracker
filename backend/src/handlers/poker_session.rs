@@ -1,45 +1,50 @@
-use actix_web::{HttpMessage, HttpRequest, HttpResponse, Responder, web};
+use axum::{
+    Extension,
+    extract::{Path, Query, State},
+    http::{StatusCode, header},
+    response::{IntoResponse, Json, Response},
+};
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{NaiveDate, Utc};
 use diesel::prelude::*;
 use serde::Deserialize;
+use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::app::AppState;
 use crate::models::{
     CreatePokerSessionRequest, NewPokerSession, PokerSession, SessionWithProfit,
     UpdatePokerSessionRequest, calculate_profit,
 };
 use crate::schema::poker_sessions;
-use crate::utils::DbPool;
 
 pub async fn create_session(
-    pool: web::Data<DbPool>,
-    req: HttpRequest,
-    session_req: web::Json<CreatePokerSessionRequest>,
-) -> impl Responder {
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Json(session_req): Json<CreatePokerSessionRequest>,
+) -> Response {
     if let Err(errors) = session_req.validate() {
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Validation failed",
-            "details": errors.to_string()
-        }));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Validation failed",
+                "details": errors.to_string()
+            })),
+        )
+            .into_response();
     }
-
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
 
     let session_date = match NaiveDate::parse_from_str(&session_req.session_date, "%Y-%m-%d") {
         Ok(date) => date,
         Err(_) => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Invalid date format. Expected YYYY-MM-DD"
-            }));
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "Invalid date format. Expected YYYY-MM-DD"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -53,12 +58,16 @@ pub async fn create_session(
         notes: session_req.notes.clone(),
     };
 
-    let mut conn = match pool.get() {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -66,29 +75,31 @@ pub async fn create_session(
         .values(&new_session)
         .get_result::<PokerSession>(&mut conn)
     {
-        Ok(session) => HttpResponse::Created().json(session),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": format!("Failed to create session: {}", e)
-        })),
+        Ok(session) => (StatusCode::CREATED, Json(session)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": format!("Failed to create session: {}", e)
+            })),
+        )
+            .into_response(),
     }
 }
 
-pub async fn get_sessions(pool: web::Data<DbPool>, req: HttpRequest) -> impl Responder {
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+pub async fn get_sessions(
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+) -> Response {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -106,39 +117,38 @@ pub async fn get_sessions(pool: web::Data<DbPool>, req: HttpRequest) -> impl Res
                     SessionWithProfit { session: s, profit }
                 })
                 .collect();
-            HttpResponse::Ok().json(sessions_with_profit)
+            (StatusCode::OK, Json(sessions_with_profit)).into_response()
         }
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Failed to fetch sessions"
-        })),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Failed to fetch sessions"
+            })),
+        )
+            .into_response(),
     }
 }
 
 pub async fn get_session(
-    pool: web::Data<DbPool>,
-    req: HttpRequest,
-    session_id: web::Path<Uuid>,
-) -> impl Responder {
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Path(session_id): Path<Uuid>,
+) -> Response {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
     match poker_sessions::table
-        .filter(poker_sessions::id.eq(session_id.into_inner()))
+        .filter(poker_sessions::id.eq(session_id))
         .filter(poker_sessions::user_id.eq(user_id))
         .first::<PokerSession>(&mut conn)
     {
@@ -148,49 +158,52 @@ pub async fn get_session(
                 &session.rebuy_amount,
                 &session.cash_out_amount,
             );
-            HttpResponse::Ok().json(SessionWithProfit { session, profit })
+            (StatusCode::OK, Json(SessionWithProfit { session, profit })).into_response()
         }
-        Err(_) => HttpResponse::NotFound().json(serde_json::json!({
-            "error": "Session not found"
-        })),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": "Session not found"
+            })),
+        )
+            .into_response(),
     }
 }
 
 pub async fn update_session(
-    pool: web::Data<DbPool>,
-    req: HttpRequest,
-    session_id: web::Path<Uuid>,
-    update_req: web::Json<UpdatePokerSessionRequest>,
-) -> impl Responder {
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Path(session_id): Path<Uuid>,
+    Json(update_req): Json<UpdatePokerSessionRequest>,
+) -> Response {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
     // Verify ownership
     let existing_session = match poker_sessions::table
-        .filter(poker_sessions::id.eq(session_id.into_inner()))
+        .filter(poker_sessions::id.eq(session_id))
         .filter(poker_sessions::user_id.eq(user_id))
         .first::<PokerSession>(&mut conn)
     {
         Ok(s) => s,
         Err(_) => {
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "error": "Session not found"
-            }));
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": "Session not found"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -198,9 +211,13 @@ pub async fn update_session(
         match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
             Ok(date) => date,
             Err(_) => {
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "Invalid date format. Expected YYYY-MM-DD"
-                }));
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": "Invalid date format. Expected YYYY-MM-DD"
+                    })),
+                )
+                    .into_response();
             }
         }
     } else {
@@ -240,52 +257,63 @@ pub async fn update_session(
         ))
         .get_result::<PokerSession>(&mut conn)
     {
-        Ok(session) => HttpResponse::Ok().json(session),
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Failed to update session"
-        })),
+        Ok(session) => (StatusCode::OK, Json(session)).into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Failed to update session"
+            })),
+        )
+            .into_response(),
     }
 }
 
 pub async fn delete_session(
-    pool: web::Data<DbPool>,
-    req: HttpRequest,
-    session_id: web::Path<Uuid>,
-) -> impl Responder {
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Path(session_id): Path<Uuid>,
+) -> Response {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
     match diesel::delete(
         poker_sessions::table
-            .filter(poker_sessions::id.eq(session_id.into_inner()))
+            .filter(poker_sessions::id.eq(session_id))
             .filter(poker_sessions::user_id.eq(user_id)),
     )
     .execute(&mut conn)
     {
-        Ok(count) if count > 0 => HttpResponse::Ok().json(serde_json::json!({
-            "message": "Session deleted successfully"
-        })),
-        Ok(_) => HttpResponse::NotFound().json(serde_json::json!({
-            "error": "Session not found"
-        })),
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Failed to delete session"
-        })),
+        Ok(count) if count > 0 => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "message": "Session deleted successfully"
+            })),
+        )
+            .into_response(),
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": "Session not found"
+            })),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Failed to delete session"
+            })),
+        )
+            .into_response(),
     }
 }
 
@@ -295,25 +323,20 @@ pub struct ExportQuery {
 }
 
 pub async fn export_sessions(
-    pool: web::Data<DbPool>,
-    req: HttpRequest,
-    query: web::Query<ExportQuery>,
-) -> impl Responder {
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Query(query): Query<ExportQuery>,
+) -> Response {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -325,9 +348,13 @@ pub async fn export_sessions(
         Some("1year") => Some(Utc::now().naive_utc().date() - chrono::Duration::days(365)),
         Some("all") | None => None,
         Some(_) => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Invalid time_range. Valid options: 7days, 30days, 90days, 1year, all"
-            }));
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "Invalid time_range. Valid options: 7days, 30days, 90days, 1year, all"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -348,16 +375,20 @@ pub async fn export_sessions(
     // Generate CSV
     let csv = generate_csv(&sessions);
 
-    HttpResponse::Ok()
-        .content_type("text/csv; charset=utf-8")
-        .insert_header((
-            "Content-Disposition",
-            format!(
-                "attachment; filename=\"poker-sessions-{}.csv\"",
-                query.time_range.as_deref().unwrap_or("all")
-            ),
-        ))
-        .body(csv)
+    let filename = format!(
+        "attachment; filename=\"poker-sessions-{}.csv\"",
+        query.time_range.as_deref().unwrap_or("all")
+    );
+
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (header::CONTENT_DISPOSITION, &filename),
+        ],
+        csv,
+    )
+        .into_response()
 }
 
 fn generate_csv(sessions: &[PokerSession]) -> String {

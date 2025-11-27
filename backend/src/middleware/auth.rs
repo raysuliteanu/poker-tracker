@@ -1,10 +1,11 @@
-use actix_web::{
-    Error, HttpMessage, HttpResponse,
-    body::EitherBody,
-    dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
+use axum::{
+    extract::Request,
+    http::StatusCode,
+    response::{IntoResponse, Json, Response},
 };
-use futures::future::LocalBoxFuture;
-use std::future::{Ready, ready};
+use serde_json::json;
+use std::task::{Context, Poll};
+use tower::{Layer, Service};
 use uuid::Uuid;
 
 use crate::utils::jwt::decode_jwt;
@@ -32,61 +33,79 @@ pub fn extract_user_id_from_auth_header(auth_header: Option<&str>) -> Result<Uui
     Uuid::parse_str(&claims.sub).map_err(|_| TokenError::InvalidUserId)
 }
 
-pub struct AuthMiddleware;
+/// Auth middleware as an Axum layer
+#[derive(Clone)]
+pub struct AuthLayer;
 
-impl<S, B> Transform<S, ServiceRequest> for AuthMiddleware
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type InitError = ();
-    type Transform = AuthMiddlewareService<S>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(AuthMiddlewareService { service }))
+impl AuthLayer {
+    pub fn new() -> Self {
+        AuthLayer
     }
 }
 
-pub struct AuthMiddlewareService<S> {
-    service: S,
+impl<S> Layer<S> for AuthLayer {
+    type Service = AuthService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        AuthService { inner }
+    }
 }
 
-impl<S, B> Service<ServiceRequest> for AuthMiddlewareService<S>
+#[derive(Clone)]
+pub struct AuthService<S> {
+    inner: S,
+}
+
+impl<S> Service<Request> for AuthService<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
+    S: Service<Request, Response = Response> + Clone + Send + 'static,
+    S::Future: Send + 'static,
 {
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    forward_ready!(service);
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
 
-    fn call(&self, req: ServiceRequest) -> Self::Future {
-        let auth_header = req
-            .headers()
-            .get("Authorization")
-            .and_then(|h| h.to_str().ok());
-
-        if let Ok(user_id) = extract_user_id_from_auth_header(auth_header) {
-            req.extensions_mut().insert(user_id);
-            let fut = self.service.call(req);
-            return Box::pin(async move {
-                let res = fut.await?;
-                Ok(res.map_into_left_body())
-            });
+    fn call(&mut self, req: Request) -> Self::Future {
+        // Skip auth for public routes
+        let path = req.uri().path();
+        if path == "/api/health" || path == "/api/auth/register" || path == "/api/auth/login" {
+            let future = self.inner.call(req);
+            return Box::pin(future);
         }
 
-        Box::pin(async move {
-            let response = HttpResponse::Unauthorized()
-                .json(serde_json::json!({"error": "Invalid or missing token"}));
-            Ok(req.into_response(response).map_into_right_body())
-        })
+        // Extract auth header
+        let auth_header = req
+            .headers()
+            .get("authorization")
+            .and_then(|h| h.to_str().ok());
+
+        match extract_user_id_from_auth_header(auth_header) {
+            Ok(user_id) => {
+                // Insert user_id into request extensions
+                let (mut parts, body) = req.into_parts();
+                parts.extensions.insert(user_id);
+                let req = Request::from_parts(parts, body);
+
+                let future = self.inner.call(req);
+                Box::pin(future)
+            }
+            Err(_) => {
+                // Return unauthorized response
+                Box::pin(async move {
+                    Ok((
+                        StatusCode::UNAUTHORIZED,
+                        Json(json!({"error": "Invalid or missing token"})),
+                    )
+                        .into_response())
+                })
+            }
+        }
     }
 }
 
@@ -99,86 +118,79 @@ mod tests {
 
     static INIT: Once = Once::new();
 
-    fn setup() {
+    fn init() {
         INIT.call_once(|| {
-            // SAFETY: Tests run single-threaded with Once guard
-            unsafe {
-                env::set_var("JWT_SECRET", "test_secret_key_for_unit_tests");
-            }
+            unsafe { env::set_var("JWT_SECRET", "test_secret_key_for_testing") };
         });
     }
 
     #[test]
     fn test_extract_user_id_missing_header() {
-        setup();
+        init();
         let result = extract_user_id_from_auth_header(None);
         assert_eq!(result, Err(TokenError::Missing));
     }
 
     #[test]
-    fn test_extract_user_id_invalid_format_no_bearer() {
-        setup();
-        let result = extract_user_id_from_auth_header(Some("InvalidHeader"));
-        assert_eq!(result, Err(TokenError::InvalidFormat));
-    }
-
-    #[test]
-    fn test_extract_user_id_invalid_format_wrong_prefix() {
-        setup();
-        let result = extract_user_id_from_auth_header(Some("Basic sometoken"));
+    fn test_extract_user_id_invalid_format() {
+        init();
+        let result = extract_user_id_from_auth_header(Some("InvalidFormat"));
         assert_eq!(result, Err(TokenError::InvalidFormat));
     }
 
     #[test]
     fn test_extract_user_id_invalid_token() {
-        setup();
-        let result = extract_user_id_from_auth_header(Some("Bearer invalid.token.here"));
+        init();
+        let result = extract_user_id_from_auth_header(Some("Bearer invalid_token"));
         assert_eq!(result, Err(TokenError::InvalidToken));
     }
 
     #[test]
-    fn test_extract_user_id_valid_token() {
-        setup();
+    fn test_extract_user_id_success() {
+        init();
         let user_id = Uuid::new_v4();
-        let token = create_jwt(user_id).expect("should create token");
+        let token = create_jwt(user_id).unwrap();
         let auth_header = format!("Bearer {}", token);
-
         let result = extract_user_id_from_auth_header(Some(&auth_header));
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), user_id);
+        assert_eq!(result, Ok(user_id));
     }
 
     #[test]
-    fn test_extract_user_id_empty_token() {
-        setup();
-        let result = extract_user_id_from_auth_header(Some("Bearer "));
-        assert_eq!(result, Err(TokenError::InvalidToken));
-    }
-
-    #[test]
-    fn test_extract_user_id_tampered_token() {
-        setup();
+    fn test_extract_user_id_case_sensitive_bearer() {
+        init();
         let user_id = Uuid::new_v4();
-        let token = create_jwt(user_id).expect("should create token");
+        let token = create_jwt(user_id).unwrap();
 
-        // Tamper with the token
-        let mut parts: Vec<&str> = token.split('.').collect();
-        if parts.len() == 3 {
-            parts[2] = "tampered_signature";
-        }
-        let tampered_token = parts.join(".");
-        let auth_header = format!("Bearer {}", tampered_token);
-
+        // Test lowercase "bearer" - should fail
+        let auth_header = format!("bearer {}", token);
         let result = extract_user_id_from_auth_header(Some(&auth_header));
+        assert_eq!(result, Err(TokenError::InvalidFormat));
+    }
+
+    #[test]
+    fn test_extract_user_id_with_whitespace() {
+        init();
+        let user_id = Uuid::new_v4();
+        let token = create_jwt(user_id).unwrap();
+
+        // Test with extra whitespace
+        let auth_header = format!("Bearer  {}", token);
+        let result = extract_user_id_from_auth_header(Some(&auth_header));
+        // This should fail because strip_prefix expects exactly one space
         assert_eq!(result, Err(TokenError::InvalidToken));
     }
 
     #[test]
-    fn test_extract_user_id_whitespace_handling() {
-        setup();
-        // Ensure extra whitespace is handled correctly
-        let result = extract_user_id_from_auth_header(Some("Bearer  token_with_extra_space"));
-        // The second space becomes part of the token, which is invalid
+    fn test_extract_user_id_with_tampered_token() {
+        init();
+        let user_id = Uuid::new_v4();
+        let mut token = create_jwt(user_id).unwrap();
+
+        // Tamper with the token by appending a character
+        token.push('x');
+
+        let auth_header = format!("Bearer {}", token);
+        let result = extract_user_id_from_auth_header(Some(&auth_header));
         assert_eq!(result, Err(TokenError::InvalidToken));
     }
 }
