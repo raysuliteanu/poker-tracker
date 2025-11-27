@@ -1,0 +1,93 @@
+name: Docker Image Analysis
+
+on:
+    # Run on pushes/PRs that modify Dockerfiles
+    push:
+        branches:
+            - main
+        paths:
+            - "backend/Dockerfile"
+            - "frontend/Dockerfile"
+    pull_request:
+        branches:
+            - main
+        paths:
+            - "backend/Dockerfile"
+            - "frontend/Dockerfile"
+    # Allow manual trigger
+    workflow_dispatch:
+
+jobs:
+    analyze-images:
+        name: Analyze Docker images with dive
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Install dive
+              run: |
+                  DIVE_VERSION=0.12.0
+                  curl -LO "https://github.com/wagoodman/dive/releases/download/v${DIVE_VERSION}/dive_${DIVE_VERSION}_linux_amd64.deb"
+                  sudo dpkg -i "dive_${DIVE_VERSION}_linux_amd64.deb"
+                  rm "dive_${DIVE_VERSION}_linux_amd64.deb"
+
+            - name: Build backend image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./backend
+                  file: ./backend/Dockerfile
+                  tags: poker-tracker-backend:latest
+                  load: true
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build frontend image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./frontend
+                  file: ./frontend/Dockerfile
+                  tags: poker-tracker-frontend:latest
+                  load: true
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Analyze backend image
+              run: |
+                  echo "### Backend Image Analysis" >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY
+                  dive poker-tracker-backend:latest --ci 2>&1 | tee backend-analysis.txt
+                  cat backend-analysis.txt >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY
+              continue-on-error: true
+
+            - name: Analyze frontend image
+              run: |
+                  echo "### Frontend Image Analysis" >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY
+                  dive poker-tracker-frontend:latest --ci 2>&1 | tee frontend-analysis.txt
+                  cat frontend-analysis.txt >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY
+              continue-on-error: true
+
+            - name: Check results
+              run: |
+                  echo "## Summary" >> $GITHUB_STEP_SUMMARY
+                  BACKEND_SIZE=$(docker images poker-tracker-backend:latest --format "{{.Size}}")
+                  FRONTEND_SIZE=$(docker images poker-tracker-frontend:latest --format "{{.Size}}")
+                  echo "- Backend image size: ${BACKEND_SIZE}" >> $GITHUB_STEP_SUMMARY
+                  echo "- Frontend image size: ${FRONTEND_SIZE}" >> $GITHUB_STEP_SUMMARY
+
+            - name: Upload analysis results
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: dive-analysis-results
+                  path: |
+                      backend-analysis.txt
+                      frontend-analysis.txt
+                  retention-days: 30
