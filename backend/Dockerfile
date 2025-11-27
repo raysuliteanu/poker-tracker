@@ -4,11 +4,14 @@ FROM rust:1.91-slim AS builder
 WORKDIR /app
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/debconf/* \
+    && rm -rf /var/lib/dpkg/*-old
 
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
@@ -27,11 +30,16 @@ FROM debian:trixie-slim
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     ca-certificates \
     wget \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/debconf/* \
+    && rm -rf /var/lib/dpkg/*-old \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
 
 # Copy the binary from builder
 COPY --from=builder /app/target/release/poker_tracker /app/poker_tracker
