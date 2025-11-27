@@ -1,31 +1,49 @@
-use actix_web::{HttpMessage, HttpRequest, HttpResponse, Responder, web};
+use axum::{
+    Extension,
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Json, Response},
+};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::Utc;
 use diesel::prelude::*;
+use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::app::AppState;
 use crate::models::{
     AuthResponse, ChangePasswordRequest, LoginRequest, NewUser, RegisterRequest,
     UpdateCookieConsent, User,
 };
 use crate::schema::users;
-use crate::utils::{DbPool, create_jwt};
+use crate::utils::create_jwt;
 
-pub async fn register(pool: web::Data<DbPool>, req: web::Json<RegisterRequest>) -> impl Responder {
+pub async fn register(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RegisterRequest>,
+) -> Response {
     if let Err(errors) = req.validate() {
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Validation failed",
-            "details": errors.to_string()
-        }));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Validation failed",
+                "details": errors.to_string()
+            })),
+        )
+            .into_response();
     }
 
     let password_hash = match hash(&req.password, DEFAULT_COST) {
         Ok(h) => h,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to hash password"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to hash password"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -35,12 +53,16 @@ pub async fn register(pool: web::Data<DbPool>, req: web::Json<RegisterRequest>) 
         password_hash,
     };
 
-    let mut conn = match pool.get() {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -61,43 +83,63 @@ pub async fn register(pool: web::Data<DbPool>, req: web::Json<RegisterRequest>) 
             } else {
                 "An account with these details already exists"
             };
-            return HttpResponse::Conflict().json(serde_json::json!({
-                "error": error_msg
-            }));
+            return (
+                StatusCode::CONFLICT,
+                Json(serde_json::json!({
+                    "error": error_msg
+                })),
+            )
+                .into_response();
         }
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to create account. Please try again."
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to create account. Please try again."
+                })),
+            )
+                .into_response();
         }
     };
 
     let token = match create_jwt(user.id) {
         Ok(t) => t,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Token generation failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Token generation failed"
+                })),
+            )
+                .into_response();
         }
     };
 
-    HttpResponse::Created().json(AuthResponse { token, user })
+    (StatusCode::CREATED, Json(AuthResponse { token, user })).into_response()
 }
 
-pub async fn login(pool: web::Data<DbPool>, req: web::Json<LoginRequest>) -> impl Responder {
+pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequest>) -> Response {
     if let Err(errors) = req.validate() {
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Validation failed",
-            "details": errors.to_string()
-        }));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Validation failed",
+                "details": errors.to_string()
+            })),
+        )
+            .into_response();
     }
 
-    let mut conn = match pool.get() {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -107,77 +149,86 @@ pub async fn login(pool: web::Data<DbPool>, req: web::Json<LoginRequest>) -> imp
     {
         Ok(u) => u,
         Err(_) => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Invalid credentials"
-            }));
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({
+                    "error": "Invalid credentials"
+                })),
+            )
+                .into_response();
         }
     };
 
     if !verify(&req.password, &user.password_hash).unwrap_or(false) {
-        return HttpResponse::Unauthorized().json(serde_json::json!({
-            "error": "Invalid credentials"
-        }));
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({
+                "error": "Invalid credentials"
+            })),
+        )
+            .into_response();
     }
 
     let token = match create_jwt(user.id) {
         Ok(t) => t,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Token generation failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Token generation failed"
+                })),
+            )
+                .into_response();
         }
     };
 
-    HttpResponse::Ok().json(AuthResponse { token, user })
+    (StatusCode::OK, Json(AuthResponse { token, user })).into_response()
 }
 
-pub async fn get_me(pool: web::Data<DbPool>, req: HttpRequest) -> impl Responder {
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+pub async fn get_me(
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+) -> Response {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
     match users::table.find(user_id).first::<User>(&mut conn) {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(_) => HttpResponse::NotFound().json(serde_json::json!({
-            "error": "User not found"
-        })),
+        Ok(user) => (StatusCode::OK, Json(user)).into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": "User not found"
+            })),
+        )
+            .into_response(),
     }
 }
 
 pub async fn update_cookie_consent(
-    pool: web::Data<DbPool>,
-    req: HttpRequest,
-    consent: web::Json<UpdateCookieConsent>,
-) -> impl Responder {
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Json(consent): Json<UpdateCookieConsent>,
+) -> Response {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -195,64 +246,79 @@ pub async fn update_cookie_consent(
         ))
         .get_result::<User>(&mut conn)
     {
-        Ok(user) => HttpResponse::Ok().json(user),
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Failed to update cookie consent"
-        })),
+        Ok(user) => (StatusCode::OK, Json(user)).into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Failed to update cookie consent"
+            })),
+        )
+            .into_response(),
     }
 }
 
 pub async fn change_password(
-    pool: web::Data<DbPool>,
-    req: HttpRequest,
-    passwords: web::Json<ChangePasswordRequest>,
-) -> impl Responder {
+    State(state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Json(passwords): Json<ChangePasswordRequest>,
+) -> Response {
     if let Err(errors) = passwords.validate() {
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Validation failed",
-            "details": errors.to_string()
-        }));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Validation failed",
+                "details": errors.to_string()
+            })),
+        )
+            .into_response();
     }
 
-    let user_id = match req.extensions().get::<Uuid>() {
-        Some(id) => *id,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Unauthorized"
-            }));
-        }
-    };
-
-    let mut conn = match pool.get() {
+    let mut conn = match state.db_pool.get() {
         Ok(conn) => conn,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Database connection failed"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Database connection failed"
+                })),
+            )
+                .into_response();
         }
     };
 
     let user = match users::table.find(user_id).first::<User>(&mut conn) {
         Ok(u) => u,
         Err(_) => {
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "error": "User not found"
-            }));
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": "User not found"
+                })),
+            )
+                .into_response();
         }
     };
 
     if !verify(&passwords.old_password, &user.password_hash).unwrap_or(false) {
-        return HttpResponse::Unauthorized().json(serde_json::json!({
-            "error": "Current password is incorrect"
-        }));
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({
+                "error": "Current password is incorrect"
+            })),
+        )
+            .into_response();
     }
 
     let new_password_hash = match hash(&passwords.new_password, DEFAULT_COST) {
         Ok(h) => h,
         Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to hash password"
-            }));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to hash password"
+                })),
+            )
+                .into_response();
         }
     };
 
@@ -263,11 +329,19 @@ pub async fn change_password(
         ))
         .execute(&mut conn)
     {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
-            "message": "Password changed successfully"
-        })),
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Failed to change password"
-        })),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "message": "Password changed successfully"
+            })),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Failed to change password"
+            })),
+        )
+            .into_response(),
     }
 }

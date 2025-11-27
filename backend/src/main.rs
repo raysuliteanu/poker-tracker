@@ -11,10 +11,17 @@ use dotenvy::dotenv;
 
 use crate::app::PokerTrackerApp;
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
-    env_logger::init();
+
+    // Initialize tracing
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
 
     let app = PokerTrackerApp::new();
     app.run().await

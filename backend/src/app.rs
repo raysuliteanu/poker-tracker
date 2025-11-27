@@ -1,15 +1,20 @@
-use actix_cors::Cors;
-use actix_web::{App, HttpResponse, HttpServer, web};
+use axum::{
+    Router,
+    routing::{get, post, put},
+};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use std::env;
-use std::io::Result;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
 
 use handlers::{auth, poker_session};
-use middleware::AuthMiddleware;
+use middleware::AuthLayer;
 use utils::establish_connection_pool;
 
-async fn health() -> HttpResponse {
-    HttpResponse::Ok().body("ok")
+async fn health() -> &'static str {
+    "ok"
 }
 
 use crate::handlers;
@@ -18,6 +23,11 @@ use crate::utils;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
+// Shared application state
+pub struct AppState {
+    pub db_pool: utils::DbPool,
+}
+
 pub(crate) struct PokerTrackerApp;
 
 impl PokerTrackerApp {
@@ -25,7 +35,7 @@ impl PokerTrackerApp {
         PokerTrackerApp
     }
 
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(self) -> std::io::Result<()> {
         let pool = establish_connection_pool();
 
         // Run migrations
@@ -37,53 +47,57 @@ impl PokerTrackerApp {
         let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
         let bind_address = format!("{}:{}", host, port);
 
-        log::info!("Starting server at http://{}", bind_address);
+        tracing::info!("Starting server at http://{}", bind_address);
 
-        HttpServer::new(move || {
-            let cors = Cors::default()
-                .allow_any_origin()
-                .allow_any_method()
-                .allow_any_header()
-                .max_age(3600);
+        // Create shared application state
+        let state = Arc::new(AppState { db_pool: pool });
 
-            App::new()
-                .wrap(cors)
-                .app_data(web::Data::new(pool.clone()))
-                .service(
-                    web::scope("/api")
-                        .route("/health", web::get().to(health))
-                        .service(
-                            web::scope("/auth")
-                                .route("/register", web::post().to(auth::register))
-                                .route("/login", web::post().to(auth::login))
-                                .service(
-                                    web::scope("")
-                                        .wrap(AuthMiddleware)
-                                        .route("/me", web::get().to(auth::get_me))
-                                        .route(
-                                            "/cookie-consent",
-                                            web::put().to(auth::update_cookie_consent),
-                                        )
-                                        .route(
-                                            "/change-password",
-                                            web::post().to(auth::change_password),
-                                        ),
-                                ),
-                        )
-                        .service(
-                            web::scope("/sessions")
-                                .wrap(AuthMiddleware)
-                                .route("", web::post().to(poker_session::create_session))
-                                .route("", web::get().to(poker_session::get_sessions))
-                                .route("/export", web::get().to(poker_session::export_sessions))
-                                .route("/{id}", web::get().to(poker_session::get_session))
-                                .route("/{id}", web::put().to(poker_session::update_session))
-                                .route("/{id}", web::delete().to(poker_session::delete_session)),
-                        ),
-                )
-        })
-        .bind(&bind_address)?
-        .run()
-        .await
+        // Configure CORS
+        let cors = CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+            .max_age(std::time::Duration::from_secs(3600));
+
+        // Build the router
+        let app = Router::new()
+            .route("/api/health", get(health))
+            // Public auth routes
+            .route("/api/auth/register", post(auth::register))
+            .route("/api/auth/login", post(auth::login))
+            // Protected auth routes
+            .route("/api/auth/me", get(auth::get_me))
+            .route("/api/auth/cookie-consent", put(auth::update_cookie_consent))
+            .route("/api/auth/change-password", post(auth::change_password))
+            // Protected session routes
+            .route(
+                "/api/sessions",
+                post(poker_session::create_session).get(poker_session::get_sessions),
+            )
+            .route("/api/sessions/export", get(poker_session::export_sessions))
+            .route(
+                "/api/sessions/{id}",
+                get(poker_session::get_session)
+                    .put(poker_session::update_session)
+                    .delete(poker_session::delete_session),
+            )
+            // Apply middleware
+            .layer(AuthLayer::new())
+            .layer(cors)
+            .layer(TraceLayer::new_for_http())
+            .with_state(state);
+
+        // Parse bind address
+        let addr: SocketAddr = bind_address
+            .parse()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+
+        // Create TCP listener
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+
+        // Run server
+        axum::serve(listener, app)
+            .await
+            .map_err(std::io::Error::other)
     }
 }
