@@ -1,5 +1,8 @@
 use axum::{
-    Router,
+    Json, Router,
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
     routing::{get, post, put},
 };
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
@@ -13,8 +16,29 @@ use handlers::{auth, poker_session};
 use middleware::AuthLayer;
 use utils::establish_connection_pool;
 
-async fn health() -> &'static str {
-    "ok"
+use diesel::RunQueryDsl;
+use diesel::sql_types::Integer;
+
+async fn health(State(state): State<Arc<AppState>>) -> Response {
+    if let Ok(mut conn) = state.db_pool.get()
+        && let Ok(_) = diesel::select(diesel::dsl::sql::<Integer>("1")).execute(&mut conn)
+    {
+        (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "Ok"
+            })),
+        )
+            .into_response()
+    } else {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Database connection failed"
+            })),
+        )
+            .into_response()
+    }
 }
 
 use crate::handlers;
