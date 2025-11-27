@@ -25,7 +25,7 @@
   <nav class="navbar">
     <div class="nav-container">
       <div class="nav-brand">
-        <a href="#/" use:link>Poker Tracker</a>
+        <a href="#/" use:link>Poker Bankroll Tracker</a>
       </div>
 
       <div class="nav-links">

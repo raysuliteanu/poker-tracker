@@ -120,10 +120,6 @@
 </script>
 
 <div class="dashboard">
-  <div class="header">
-    <h1>Poker Bankroll Tracker</h1>
-  </div>
-
   {#if error}
     <div class="error">{error}</div>
   {/if}
@@ -223,16 +219,6 @@
     flex: 1;
   }
 
-  .header {
-    margin-bottom: 1rem;
-  }
-
-  h1 {
-    margin: 0;
-    color: var(--color-text);
-    font-size: 1.5rem;
-  }
-
   .error {
     background-color: #fee;
     color: #c33;
@@ -257,6 +243,7 @@
 
   .stat-label {
     font-size: 0.75rem;
+    font-weight: 600;
     color: var(--color-text-secondary);
     margin-bottom: 0.25rem;
   }

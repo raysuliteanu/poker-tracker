@@ -29,7 +29,7 @@ describe('Navigation', () => {
 
     render(Navigation);
 
-    expect(screen.getByText('Poker Tracker')).toBeInTheDocument();
+    expect(screen.getByText('Poker Bankroll Tracker')).toBeInTheDocument();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Charts')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();

@@ -52,15 +52,14 @@ describe('Dashboard', () => {
     expect(screen.getByText('Loading sessions...')).toBeInTheDocument();
   });
 
-  it('renders dashboard header and toolbar buttons', async () => {
+  it('renders dashboard toolbar buttons', async () => {
     vi.mocked(api.sessions.getAll).mockResolvedValue({ data: mockSessions });
 
     render(Dashboard);
 
     await waitFor(() => {
-      expect(screen.getByText('Poker Bankroll Tracker')).toBeInTheDocument();
+      expect(screen.getByLabelText('Add Session')).toBeInTheDocument();
     });
-    expect(screen.getByLabelText('Add Session')).toBeInTheDocument();
     expect(screen.getByLabelText('Export Sessions')).toBeInTheDocument();
   });
 
@@ -138,7 +137,7 @@ describe('Dashboard', () => {
     render(Dashboard);
 
     await waitFor(() => {
-      expect(screen.getByText('Poker Bankroll Tracker')).toBeInTheDocument();
+      expect(screen.getByLabelText('Add Session')).toBeInTheDocument();
     });
 
     const addButton = screen.getByLabelText('Add Session');
@@ -153,7 +152,7 @@ describe('Dashboard', () => {
     render(Dashboard);
 
     await waitFor(() => {
-      expect(screen.getByText('Poker Bankroll Tracker')).toBeInTheDocument();
+      expect(screen.getByLabelText('Add Session')).toBeInTheDocument();
     });
 
     // Open form

@@ -21,7 +21,7 @@ async function loginUser(page: any) {
 
   // Wait for redirect to dashboard
   await page.waitForURL(/#\//);
-  await expect(page.getByRole('heading', { name: 'Poker Bankroll Tracker' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Poker Bankroll Tracker' })).toBeVisible();
 
   // Dismiss cookie consent banner if it appears
   const acceptCookiesButton = page.getByRole('button', { name: 'Accept' });
@@ -72,7 +72,7 @@ test.describe('Dashboard - Poker Sessions', () => {
   });
 
   test('displays empty dashboard with zero stats', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Poker Bankroll Tracker' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Poker Bankroll Tracker' })).toBeVisible();
     await expect(page.getByLabel('Add Session')).toBeVisible();
 
     // Check stats cards show zeros
@@ -545,7 +545,7 @@ test.describe('Dashboard - Charts Navigation', () => {
 
   test('navigates to Charts page from navbar', async ({ page }) => {
     // Should be on dashboard initially
-    await expect(page.getByRole('heading', { name: 'Poker Bankroll Tracker' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Poker Bankroll Tracker' })).toBeVisible();
 
     // Click Charts link in navbar
     await page.getByRole('link', { name: 'Charts' }).click();
