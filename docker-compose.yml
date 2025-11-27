@@ -7,7 +7,7 @@ services:
             POSTGRES_PASSWORD: password
             POSTGRES_DB: poker_tracker
         ports:
-            - "5433:5432"
+            - "5433:5432"  # Keep port mapping for dev environment
         volumes:
             - postgres_data:/var/lib/postgresql/data
         healthcheck:
@@ -28,7 +28,7 @@ services:
             HOST: 0.0.0.0
             PORT: 8080
         ports:
-            - "8080:8080"
+            - "8080:8080"  # Keep port mapping for dev environment
         depends_on:
             postgres:
                 condition: service_healthy
@@ -45,7 +45,9 @@ services:
             dockerfile: Dockerfile
         container_name: poker_tracker_frontend
         environment:
-            VITE_API_URL: http://localhost:8080/api
+            VITE_API_URL: /api
+            BACKEND_URL: http://backend:8080
+            BACKEND_HOST: backend
         ports:
             - "8888:80"
         depends_on:

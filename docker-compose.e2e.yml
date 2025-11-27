@@ -6,8 +6,6 @@ services:
             POSTGRES_USER: postgres
             POSTGRES_PASSWORD: password
             POSTGRES_DB: poker_tracker
-        ports:
-            - "5433:5432"
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U postgres"]
             interval: 5s
@@ -41,7 +39,9 @@ services:
             dockerfile: Dockerfile
         container_name: poker_tracker_e2e_frontend
         environment:
-            VITE_API_URL: http://backend:8080/api
+            VITE_API_URL: /api
+            BACKEND_URL: http://backend:8080
+            BACKEND_HOST: backend
         depends_on:
             backend:
                 condition: service_healthy
