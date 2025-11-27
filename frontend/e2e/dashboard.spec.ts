@@ -316,6 +316,12 @@ test.describe('Dashboard - Edit Sessions', () => {
     // Cancel the edit
     await page.getByRole('button', { name: 'Cancel' }).click();
 
+    // Confirmation dialog should appear
+    await expect(page.getByRole('dialog').filter({ hasText: 'Unsaved Changes' })).toBeVisible();
+
+    // Click Continue to discard changes and close
+    await page.getByRole('button', { name: 'Continue' }).click();
+
     // Verify modal closed
     await expect(page.getByRole('heading', { name: 'Edit Session' })).not.toBeVisible();
 
