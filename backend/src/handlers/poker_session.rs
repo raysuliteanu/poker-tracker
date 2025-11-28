@@ -9,6 +9,7 @@ use chrono::{NaiveDate, Utc};
 use diesel::prelude::*;
 use serde::Deserialize;
 use std::sync::Arc;
+use thiserror::Error;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -18,6 +19,49 @@ use crate::models::{
     UpdatePokerSessionRequest, calculate_profit,
 };
 use crate::schema::poker_sessions;
+use crate::utils::DbConnectionProvider;
+
+#[derive(Debug, Error)]
+pub enum CreateSessionError {
+    #[error("Invalid date format: {0}")]
+    InvalidDateFormat(String),
+    #[error("Database connection error: {0}")]
+    DatabaseConnection(String),
+    #[error("Database error: {0}")]
+    Database(#[from] diesel::result::Error),
+}
+
+pub async fn do_create_session<P>(
+    db_provider: &P,
+    user_id: Uuid,
+    session_req: CreatePokerSessionRequest,
+) -> Result<PokerSession, CreateSessionError>
+where
+    P: DbConnectionProvider,
+    P::Connection:
+        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
+{
+    let session_date = NaiveDate::parse_from_str(&session_req.session_date, "%Y-%m-%d")
+        .map_err(|e| CreateSessionError::InvalidDateFormat(e.to_string()))?;
+
+    let new_session = NewPokerSession {
+        user_id,
+        session_date,
+        duration_minutes: session_req.duration_minutes,
+        buy_in_amount: BigDecimal::from_f64(session_req.buy_in_amount).unwrap(),
+        rebuy_amount: BigDecimal::from_f64(session_req.rebuy_amount.unwrap_or(0.0)).unwrap(),
+        cash_out_amount: BigDecimal::from_f64(session_req.cash_out_amount).unwrap(),
+        notes: session_req.notes.clone(),
+    };
+
+    let mut conn = db_provider.get_connection().map_err(|_| {
+        CreateSessionError::DatabaseConnection("Failed to get connection".to_string())
+    })?;
+
+    Ok(diesel::insert_into(poker_sessions::table)
+        .values(&new_session)
+        .get_result::<PokerSession>(&mut conn)?)
+}
 
 pub async fn create_session(
     State(state): State<Arc<AppState>>,
@@ -35,47 +79,15 @@ pub async fn create_session(
             .into_response();
     }
 
-    let session_date = match NaiveDate::parse_from_str(&session_req.session_date, "%Y-%m-%d") {
-        Ok(date) => date,
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({
-                    "error": "Invalid date format. Expected YYYY-MM-DD"
-                })),
-            )
-                .into_response();
-        }
-    };
-
-    let new_session = NewPokerSession {
-        user_id,
-        session_date,
-        duration_minutes: session_req.duration_minutes,
-        buy_in_amount: BigDecimal::from_f64(session_req.buy_in_amount).unwrap(),
-        rebuy_amount: BigDecimal::from_f64(session_req.rebuy_amount.unwrap_or(0.0)).unwrap(),
-        cash_out_amount: BigDecimal::from_f64(session_req.cash_out_amount).unwrap(),
-        notes: session_req.notes.clone(),
-    };
-
-    let mut conn = match state.db_pool.get() {
-        Ok(conn) => conn,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({
-                    "error": "Database connection failed"
-                })),
-            )
-                .into_response();
-        }
-    };
-
-    match diesel::insert_into(poker_sessions::table)
-        .values(&new_session)
-        .get_result::<PokerSession>(&mut conn)
-    {
+    match do_create_session(&state.db_pool, user_id, session_req).await {
         Ok(session) => (StatusCode::CREATED, Json(session)).into_response(),
+        Err(CreateSessionError::InvalidDateFormat(msg)) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Invalid date format: {}", msg)
+            })),
+        )
+            .into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({

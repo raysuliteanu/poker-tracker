@@ -1,6 +1,5 @@
 use diesel::PgConnection;
 use diesel::prelude::*;
-use rstest::fixture;
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
@@ -9,7 +8,7 @@ use testcontainers_modules::postgres::Postgres;
 pub struct TestDb {
     pub database_url: String,
     // The container handle must be held for the database to stay alive
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     container: ContainerAsync<Postgres>,
 }
 
@@ -45,15 +44,23 @@ impl TestDb {
 
         Ok(())
     }
+}
 
-    /// Provides a connection for a test to use.
-    pub fn get_connection(&self) -> PgConnection {
+impl poker_tracker::utils::DbConnectionProvider for TestDb {
+    type Connection = PgConnection;
+    type Error = diesel::ConnectionError;
+
+    fn get_connection(&self) -> Result<Self::Connection, Self::Error> {
         PgConnection::establish(&self.database_url)
-            .expect("Failed to establish a connection to the test database")
     }
 }
 
-#[fixture]
-pub async fn test_db() -> TestDb {
-    TestDb::new().await
+pub(crate) mod fixtures {
+    use crate::common::TestDb;
+    use rstest::fixture;
+
+    #[fixture]
+    pub async fn test_db() -> TestDb {
+        TestDb::new().await
+    }
 }

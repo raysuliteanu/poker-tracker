@@ -1712,6 +1712,7 @@ dependencies = [
  "serde_json",
  "testcontainers",
  "testcontainers-modules",
+ "thiserror",
  "tokio",
  "tower",
  "tower-http",
