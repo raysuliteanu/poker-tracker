@@ -69,11 +69,13 @@ to fork and make a PR.
 ### Backend
 
 - **Language**: Rust
-- **Framework**: Actix-web
+- **Framework**: Axum
 - **Database**: PostgreSQL
 - **ORM**: Diesel
 - **Authentication**: JWT (jsonwebtoken), bcrypt
+- **Error Handling**: thiserror
 - **Migrations**: diesel_migrations
+- **Testing**: testcontainers, rstest
 
 ### Frontend
 
@@ -291,12 +293,23 @@ npm test
 
 ### Backend Tests
 
-The backend uses Rust's built-in test framework. Tests cover authentication,
-session management, and API endpoints.
+The backend includes both unit tests and integration tests:
+
+- **Unit tests**: Located within individual source files
+- **Integration tests**: Located in `backend/tests/` directory
+
+Integration tests use:
+- **testcontainers**: Automatically spins up PostgreSQL containers for isolated testing
+- **rstest**: Provides fixtures for test setup (e.g., `test_db` fixture)
+
+The `DbConnectionProvider` trait allows handlers to work with both pooled connections
+(production) and direct connections (tests), enabling true integration testing of
+business logic.
 
 ```bash
 cd backend
-cargo test
+cargo test                        # Run all tests
+cargo test --test session_tests   # Run specific integration test
 ```
 
 ### Frontend Tests

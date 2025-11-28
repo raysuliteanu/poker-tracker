@@ -17,18 +17,22 @@ Tracker application.
 
 ### Technology Stack
 
-- **Framework:** Actix-web 4.x
+- **Framework:** Axum 0.8
 - **ORM:** Diesel 2.x with PostgreSQL
 - **Authentication:** JWT (jsonwebtoken crate)
 - **Password Hashing:** bcrypt
 - **Validation:** validator crate
+- **Error Handling:** thiserror
+- **Testing:** testcontainers, rstest
 
 ### Directory Structure
 
 ```
 backend/
 ├── src/
-│   ├── main.rs              # Entry point, server config, routes
+│   ├── main.rs              # Binary entry point
+│   ├── lib.rs               # Re-exports modules for integration tests
+│   ├── app.rs               # Application setup, server config, routes
 │   ├── schema.rs            # Diesel-generated database schema
 │   ├── handlers/
 │   │   ├── mod.rs
@@ -40,11 +44,15 @@ backend/
 │   │   └── poker_session.rs # PokerSession model
 │   ├── middleware/
 │   │   ├── mod.rs
-│   │   └── auth.rs          # JWT authentication middleware
+│   │   └── auth.rs          # JWT authentication middleware (Axum layer)
 │   └── utils/
 │       ├── mod.rs
-│       ├── db.rs            # Database connection pool
+│       ├── db.rs            # Database pool and DbConnectionProvider trait
 │       └── jwt.rs           # JWT creation/validation
+├── tests/
+│   ├── common/
+│   │   └── mod.rs           # TestDb fixture using testcontainers
+│   └── session_tests.rs     # Integration tests
 ├── migrations/              # Diesel migrations
 ├── Cargo.toml
 └── Dockerfile
@@ -52,35 +60,49 @@ backend/
 
 ### Request Flow
 
-1. Request arrives at Actix-web server
-2. CORS middleware processes headers
-3. For protected routes, `AuthMiddleware` validates JWT
-4. Handler processes request, interacts with database via Diesel
-5. JSON response returned
+1. Request arrives at Axum server
+2. TraceLayer logs request
+3. CORS middleware processes headers
+4. For protected routes, `AuthLayer` validates JWT and extracts user_id
+5. Handler processes request, interacts with database via Diesel
+6. JSON response returned
 
 ### Authentication Middleware
 
-The `AuthMiddleware` (`middleware/auth.rs`):
+The `AuthLayer` and `AuthMiddleware` (`middleware/auth.rs`):
 
+- Implemented as an Axum Tower layer
 - Extracts Bearer token from Authorization header
 - Validates JWT and extracts user_id from claims
-- Stores user_id in request extensions for handler access
+- Injects user_id as an Axum `Extension` for handler access
 - Returns JSON error `{"error": "Invalid or missing token"}` on failure
+- Uses `thiserror` for error type definitions
 
 ```rust
-// Accessing user_id in handlers:
-let user_id = req.extensions().get::<Uuid>().unwrap();
+// Accessing user_id in Axum handlers:
+pub async fn handler(Extension(user_id): Extension<Uuid>) -> Response {
+    // handler logic
+}
 ```
 
 ### Error Handling
 
+- Uses `thiserror` crate for custom error types with derive macros
 - All errors return JSON responses with `{"error": "message"}` format
+- Custom error enums defined per handler module (e.g., `CreateSessionError`)
 - Unique constraint violations (duplicate email/username) return user-friendly messages
 - Auth failures return 401 with JSON body
+- Error types implement `Display` and `Error` traits via `#[derive(Error)]`
 
 ### Database
 
 **Connection Pooling:** r2d2 with Diesel PostgreSQL backend
+
+**DbConnectionProvider Trait:** Abstraction that allows handlers to work with both:
+- Production: Connection pools (`DbPool`)
+- Testing: Direct connections from testcontainers (`TestDb`)
+
+This enables true integration testing of business logic without mocking.
 
 **Migrations:** Run automatically on startup via `embed_migrations!` macro
 
@@ -113,6 +135,48 @@ CREATE TABLE poker_sessions (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
+
+### Integration Testing
+
+**Framework:** testcontainers + rstest
+
+**Location:** `backend/tests/` directory
+
+**Key Components:**
+
+1. **TestDb struct** (`tests/common/mod.rs`):
+   - Manages a temporary PostgreSQL container using testcontainers
+   - Runs migrations automatically on container startup
+   - Implements `DbConnectionProvider` trait for handler compatibility
+   - Container lifecycle tied to TestDb instance (automatic cleanup)
+
+2. **rstest fixtures** (`tests/common/mod.rs`):
+   - `#[fixture]` async fn test_db() provides fresh database for each test
+   - Use with `#[rstest]` attribute on test functions
+
+3. **Handler testing pattern**:
+   - Extract business logic into `do_*` functions accepting `DbConnectionProvider`
+   - Call `do_*` functions directly in tests with `TestDb` instance
+   - Enables testing without HTTP layer, focusing on business logic
+
+**Example:**
+
+```rust
+#[rstest]
+#[tokio::test]
+async fn test_create_session(#[future] test_db: TestDb) {
+    let db = test_db.await;
+    // Create test data directly via Diesel
+    // Call handler's do_* function with TestDb
+    // Assert results
+}
+```
+
+**Benefits:**
+- Real PostgreSQL database (not mocks or SQLite)
+- Isolated test environment per test
+- Tests actual SQL queries and migrations
+- Fast setup/teardown with containers
 
 ## Frontend Architecture
 
