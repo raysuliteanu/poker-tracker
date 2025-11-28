@@ -73,7 +73,7 @@ pub struct ChangePasswordRequest {
 }
 
 #[derive(Debug, Deserialize, Validate)]
-#[expect(dead_code)]
+#[allow(dead_code)]
 pub struct ResetPasswordRequest {
     #[validate(email(message = "Invalid email address"))]
     pub email: String,

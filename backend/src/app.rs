@@ -19,6 +19,9 @@ use utils::establish_connection_pool;
 use diesel::RunQueryDsl;
 use diesel::sql_types::Integer;
 
+// this method is called from the /api/health route, via Axum
+// I guess clippy can't deduce that
+#[allow(dead_code)]
 async fn health(State(state): State<Arc<AppState>>) -> Response {
     if let Ok(mut conn) = state.db_pool.get()
         && let Ok(_) = diesel::select(diesel::dsl::sql::<Integer>("1")).execute(&mut conn)
@@ -52,7 +55,7 @@ pub struct AppState {
     pub db_pool: utils::DbPool,
 }
 
-pub(crate) struct PokerTrackerApp;
+pub struct PokerTrackerApp;
 
 impl PokerTrackerApp {
     pub fn new() -> Self {
@@ -123,5 +126,11 @@ impl PokerTrackerApp {
         axum::serve(listener, app)
             .await
             .map_err(std::io::Error::other)
+    }
+}
+
+impl Default for PokerTrackerApp {
+    fn default() -> Self {
+        Self::new()
     }
 }

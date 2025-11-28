@@ -5,17 +5,22 @@ use axum::{
 };
 use serde_json::json;
 use std::task::{Context, Poll};
+use thiserror::Error;
 use tower::{Layer, Service};
 use uuid::Uuid;
 
 use crate::utils::jwt::decode_jwt;
 
 /// Error type for token extraction failures
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Error, PartialEq)]
 pub enum TokenError {
+    #[error("Authorization header is missing")]
     Missing,
+    #[error("Invalid authorization header format (expected 'Bearer <token>')")]
     InvalidFormat,
+    #[error("Invalid or expired JWT token")]
     InvalidToken,
+    #[error("Invalid user ID in token claims")]
     InvalidUserId,
 }
 
@@ -34,7 +39,7 @@ pub fn extract_user_id_from_auth_header(auth_header: Option<&str>) -> Result<Uui
 }
 
 /// Auth middleware as an Axum layer
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AuthLayer;
 
 impl AuthLayer {
