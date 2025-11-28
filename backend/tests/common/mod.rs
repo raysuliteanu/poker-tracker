@@ -1,7 +1,8 @@
 use diesel::PgConnection;
 use diesel::prelude::*;
-use testcontainers::runners::AsyncRunner;
+use rstest::fixture;
 use testcontainers::ContainerAsync;
+use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
 
 /// A struct that manages a temporary PostgreSQL container and its connection URL.
@@ -50,4 +51,9 @@ impl TestDb {
         PgConnection::establish(&self.database_url)
             .expect("Failed to establish a connection to the test database")
     }
+}
+
+#[fixture]
+pub async fn test_db() -> TestDb {
+    TestDb::new().await
 }
