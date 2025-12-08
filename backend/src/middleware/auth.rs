@@ -118,6 +118,7 @@ where
 mod tests {
     use super::*;
     use crate::utils::jwt::create_jwt;
+    use proptest::prelude::*;
     use std::env;
     use std::sync::Once;
 
@@ -197,5 +198,103 @@ mod tests {
         let auth_header = format!("Bearer {}", token);
         let result = extract_user_id_from_auth_header(Some(&auth_header));
         assert_eq!(result, Err(TokenError::InvalidToken));
+    }
+
+    // Property-based tests for auth header parsing
+    proptest! {
+        #[test]
+        fn missing_bearer_prefix_fails(s in "[a-zA-Z0-9_.-]{10,100}") {
+            init();
+            // Any string without "Bearer " prefix should fail
+            if !s.starts_with("Bearer ") {
+                let result = extract_user_id_from_auth_header(Some(&s));
+                prop_assert_eq!(result, Err(TokenError::InvalidFormat));
+            }
+        }
+
+        #[test]
+        fn lowercase_bearer_fails(token in "[a-zA-Z0-9_.-]{20,100}") {
+            init();
+            let auth_header = format!("bearer {}", token);
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            prop_assert_eq!(result, Err(TokenError::InvalidFormat));
+        }
+
+        #[test]
+        fn uppercase_bearer_fails(token in "[a-zA-Z0-9_.-]{20,100}") {
+            init();
+            let auth_header = format!("BEARER {}", token);
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            prop_assert_eq!(result, Err(TokenError::InvalidFormat));
+        }
+
+        #[test]
+        fn invalid_token_after_bearer_fails(token in "[a-zA-Z0-9]{10,50}") {
+            init();
+            // Random alphanumeric strings are not valid JWTs
+            let auth_header = format!("Bearer {}", token);
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            prop_assert_eq!(result, Err(TokenError::InvalidToken));
+        }
+
+        #[test]
+        fn valid_jwt_roundtrip_works(_dummy in 0..100_i32) {
+            init();
+            let user_id = Uuid::new_v4();
+            let token = create_jwt(user_id).unwrap();
+            let auth_header = format!("Bearer {}", token);
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            prop_assert_eq!(result, Ok(user_id));
+        }
+
+        #[test]
+        fn extra_spaces_after_bearer_fails(spaces in 2..=5_usize) {
+            init();
+            let user_id = Uuid::new_v4();
+            let token = create_jwt(user_id).unwrap();
+            let space_str: String = (0..spaces).map(|_| ' ').collect();
+            let auth_header = format!("Bearer{}{}", space_str, token);
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            // "Bearer  token" doesn't match "Bearer " prefix correctly
+            prop_assert!(result.is_err());
+        }
+
+        #[test]
+        fn token_with_prefix_whitespace_fails(spaces in 1..=3_usize) {
+            init();
+            let user_id = Uuid::new_v4();
+            let token = create_jwt(user_id).unwrap();
+            let space_str: String = (0..spaces).map(|_| ' ').collect();
+            let auth_header = format!("Bearer {}{}", space_str, token);
+            // Leading whitespace in token part should cause invalid token
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            prop_assert_eq!(result, Err(TokenError::InvalidToken));
+        }
+
+        #[test]
+        fn tampered_token_fails(char_to_append in "[a-zA-Z0-9]") {
+            init();
+            let user_id = Uuid::new_v4();
+            let mut token = create_jwt(user_id).unwrap();
+            token.push_str(&char_to_append);
+            let auth_header = format!("Bearer {}", token);
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            prop_assert_eq!(result, Err(TokenError::InvalidToken));
+        }
+
+        #[test]
+        fn truncated_token_fails(truncate_amount in 1..=10_usize) {
+            init();
+            let user_id = Uuid::new_v4();
+            let token = create_jwt(user_id).unwrap();
+            let truncated = if token.len() > truncate_amount {
+                &token[..token.len() - truncate_amount]
+            } else {
+                ""
+            };
+            let auth_header = format!("Bearer {}", truncated);
+            let result = extract_user_id_from_auth_header(Some(&auth_header));
+            prop_assert_eq!(result, Err(TokenError::InvalidToken));
+        }
     }
 }

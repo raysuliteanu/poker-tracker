@@ -76,6 +76,7 @@ mod tests {
     use super::*;
     use bigdecimal::FromPrimitive;
     use chrono::Datelike;
+    use proptest::prelude::*;
     use validator::Validate;
 
     // CreatePokerSessionRequest validation tests
@@ -248,5 +249,160 @@ mod tests {
         let date_str = "2024-13-45"; // invalid month and day
         let result = NaiveDate::parse_from_str(date_str, "%Y-%m-%d");
         assert!(result.is_err());
+    }
+
+    // Property-based tests for calculate_profit
+    proptest! {
+        #[test]
+        fn profit_equals_cashout_minus_total_invested(
+            buy_in in 0.0..100_000.0_f64,
+            rebuy in 0.0..100_000.0_f64,
+            cash_out in 0.0..200_000.0_f64,
+        ) {
+            let buy_in_bd = BigDecimal::from_f64(buy_in).unwrap();
+            let rebuy_bd = BigDecimal::from_f64(rebuy).unwrap();
+            let cash_out_bd = BigDecimal::from_f64(cash_out).unwrap();
+
+            let profit = calculate_profit(&buy_in_bd, &rebuy_bd, &cash_out_bd);
+            let expected = cash_out - (buy_in + rebuy);
+
+            // Allow small floating point tolerance
+            prop_assert!((profit - expected).abs() < 0.01,
+                "profit {} != expected {} for buy_in={}, rebuy={}, cash_out={}",
+                profit, expected, buy_in, rebuy, cash_out);
+        }
+
+        #[test]
+        fn profit_sign_is_correct(
+            buy_in in 0.0..100_000.0_f64,
+            rebuy in 0.0..100_000.0_f64,
+            cash_out in 0.0..200_000.0_f64,
+        ) {
+            let buy_in_bd = BigDecimal::from_f64(buy_in).unwrap();
+            let rebuy_bd = BigDecimal::from_f64(rebuy).unwrap();
+            let cash_out_bd = BigDecimal::from_f64(cash_out).unwrap();
+
+            let profit = calculate_profit(&buy_in_bd, &rebuy_bd, &cash_out_bd);
+            let total_invested = buy_in + rebuy;
+
+            if cash_out > total_invested + 0.001 {
+                prop_assert!(profit > 0.0, "Expected positive profit when cash_out > total_invested");
+            } else if cash_out < total_invested - 0.001 {
+                prop_assert!(profit < 0.0, "Expected negative profit when cash_out < total_invested");
+            }
+            // Near break-even, allow either sign due to floating point
+        }
+
+        #[test]
+        fn profit_with_zero_rebuy_equals_simple_difference(
+            buy_in in 0.0..100_000.0_f64,
+            cash_out in 0.0..200_000.0_f64,
+        ) {
+            let buy_in_bd = BigDecimal::from_f64(buy_in).unwrap();
+            let rebuy_bd = BigDecimal::from_f64(0.0).unwrap();
+            let cash_out_bd = BigDecimal::from_f64(cash_out).unwrap();
+
+            let profit = calculate_profit(&buy_in_bd, &rebuy_bd, &cash_out_bd);
+            let expected = cash_out - buy_in;
+
+            prop_assert!((profit - expected).abs() < 0.01,
+                "profit {} != expected {} for buy_in={}, cash_out={}",
+                profit, expected, buy_in, cash_out);
+        }
+
+        #[test]
+        fn profit_is_zero_when_cashout_equals_total_invested(
+            buy_in in 0.0..100_000.0_f64,
+            rebuy in 0.0..100_000.0_f64,
+        ) {
+            let cash_out = buy_in + rebuy;
+            let buy_in_bd = BigDecimal::from_f64(buy_in).unwrap();
+            let rebuy_bd = BigDecimal::from_f64(rebuy).unwrap();
+            let cash_out_bd = BigDecimal::from_f64(cash_out).unwrap();
+
+            let profit = calculate_profit(&buy_in_bd, &rebuy_bd, &cash_out_bd);
+
+            prop_assert!(profit.abs() < 0.01,
+                "Expected break-even (profit ~= 0), got {} for buy_in={}, rebuy={}",
+                profit, buy_in, rebuy);
+        }
+    }
+
+    // Property-based tests for duration validation
+    proptest! {
+        #[test]
+        fn valid_duration_passes_validation(duration in 1..=i32::MAX) {
+            let req = CreatePokerSessionRequest {
+                session_date: "2024-01-15".to_string(),
+                duration_minutes: duration,
+                buy_in_amount: 100.0,
+                rebuy_amount: None,
+                cash_out_amount: 150.0,
+                notes: None,
+            };
+            prop_assert!(req.validate().is_ok(),
+                "Duration {} should be valid", duration);
+        }
+
+        #[test]
+        fn invalid_duration_fails_validation(duration in i32::MIN..=0) {
+            let req = CreatePokerSessionRequest {
+                session_date: "2024-01-15".to_string(),
+                duration_minutes: duration,
+                buy_in_amount: 100.0,
+                rebuy_amount: None,
+                cash_out_amount: 150.0,
+                notes: None,
+            };
+            let result = req.validate();
+            prop_assert!(result.is_err(),
+                "Duration {} should be invalid", duration);
+            let errors = result.unwrap_err();
+            prop_assert!(errors.field_errors().contains_key("duration_minutes"));
+        }
+    }
+
+    // Property-based tests for date parsing
+    proptest! {
+        #[test]
+        fn valid_dates_parse_correctly(
+            year in 1970..2100_i32,
+            month in 1..=12_u32,
+            day in 1..=28_u32,  // Safe for all months
+        ) {
+            let date_str = format!("{:04}-{:02}-{:02}", year, month, day);
+            let result = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d");
+            prop_assert!(result.is_ok(),
+                "Date {} should parse correctly", date_str);
+
+            let date = result.unwrap();
+            prop_assert_eq!(date.year(), year);
+            prop_assert_eq!(date.month(), month);
+            prop_assert_eq!(date.day(), day);
+        }
+
+        #[test]
+        fn invalid_month_fails_parsing(
+            year in 1970..2100_i32,
+            month in 13..=99_u32,
+            day in 1..=28_u32,
+        ) {
+            let date_str = format!("{:04}-{:02}-{:02}", year, month, day);
+            let result = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d");
+            prop_assert!(result.is_err(),
+                "Date {} with invalid month should fail", date_str);
+        }
+
+        #[test]
+        fn invalid_day_fails_parsing(
+            year in 1970..2100_i32,
+            month in 1..=12_u32,
+            day in 32..=99_u32,
+        ) {
+            let date_str = format!("{:04}-{:02}-{:02}", year, month, day);
+            let result = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d");
+            prop_assert!(result.is_err(),
+                "Date {} with invalid day should fail", date_str);
+        }
     }
 }

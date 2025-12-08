@@ -502,6 +502,7 @@ mod tests {
     use super::*;
     use bigdecimal::FromPrimitive;
     use chrono::{NaiveDate, Utc};
+    use proptest::prelude::*;
 
     // CSV field escaping tests
     #[test]
@@ -702,6 +703,120 @@ mod tests {
                 minutes,
                 lines[1]
             );
+        }
+    }
+
+    // Property-based tests for CSV escaping
+    proptest! {
+        #[test]
+        fn field_without_special_chars_unchanged(s in "[a-zA-Z0-9 ]{0,100}") {
+            // Fields without commas, quotes, or newlines should remain unchanged
+            let result = escape_csv_field(&s);
+            prop_assert_eq!(result, s);
+        }
+
+        #[test]
+        fn field_with_comma_gets_quoted(
+            prefix in "[a-zA-Z0-9]{0,20}",
+            suffix in "[a-zA-Z0-9]{0,20}",
+        ) {
+            let input = format!("{},{}", prefix, suffix);
+            let result = escape_csv_field(&input);
+            prop_assert!(result.starts_with('"'), "Result should start with quote: {}", result);
+            prop_assert!(result.ends_with('"'), "Result should end with quote: {}", result);
+            // The inner content should have the comma
+            prop_assert!(result.contains(','));
+        }
+
+        #[test]
+        fn field_with_newline_gets_quoted(
+            prefix in "[a-zA-Z0-9]{0,20}",
+            suffix in "[a-zA-Z0-9]{0,20}",
+        ) {
+            let input = format!("{}\n{}", prefix, suffix);
+            let result = escape_csv_field(&input);
+            prop_assert!(result.starts_with('"'), "Result should start with quote: {}", result);
+            prop_assert!(result.ends_with('"'), "Result should end with quote: {}", result);
+        }
+
+        #[test]
+        fn field_with_quotes_gets_doubled(
+            prefix in "[a-zA-Z0-9]{0,20}",
+            middle in "[a-zA-Z0-9]{0,20}",
+            suffix in "[a-zA-Z0-9]{0,20}",
+        ) {
+            let input = format!("{}\"{}\"{}",prefix, middle, suffix);
+            let result = escape_csv_field(&input);
+            // Should be wrapped in quotes
+            prop_assert!(result.starts_with('"'));
+            prop_assert!(result.ends_with('"'));
+            // Internal quotes should be doubled
+            let inner = &result[1..result.len()-1];
+            prop_assert!(inner.contains("\"\""), "Internal quotes should be doubled: {}", result);
+        }
+
+        #[test]
+        fn escaped_field_preserves_content_semantically(s in "[ -~]{0,50}") {
+            // ASCII printable characters
+            let result = escape_csv_field(&s);
+            // The content should be recoverable
+            if result.starts_with('"') && result.ends_with('"') {
+                let inner = &result[1..result.len()-1];
+                let unescaped = inner.replace("\"\"", "\"");
+                prop_assert_eq!(unescaped, s.clone(), "Content not preserved for input: {:?}", s);
+            } else {
+                prop_assert_eq!(result, s.clone(), "Non-quoted content should match");
+            }
+        }
+
+        #[test]
+        fn multiple_commas_all_preserved(count in 1..=5_usize) {
+            let input: String = (0..count).map(|_| "a,").collect();
+            let result = escape_csv_field(&input);
+            // Count commas in result (excluding wrapper quotes)
+            let inner = &result[1..result.len()-1];
+            let comma_count = inner.matches(',').count();
+            prop_assert_eq!(comma_count, count, "All commas should be preserved");
+        }
+
+        #[test]
+        fn multiple_quotes_all_doubled(count in 1..=5_usize) {
+            let input: String = (0..count).map(|_| "\"").collect();
+            let result = escape_csv_field(&input);
+            // Should be wrapped, and each quote doubled
+            // Input of n quotes becomes: "quote quote ... quote" with each quote doubled
+            let inner = &result[1..result.len()-1];
+            let doubled_count = inner.matches("\"\"").count();
+            prop_assert_eq!(doubled_count, count, "All quotes should be doubled");
+        }
+    }
+
+    // Property-based tests for duration to hours conversion
+    proptest! {
+        #[test]
+        fn duration_conversion_is_correct(minutes in 1..=10000_i32) {
+            let expected_hours = minutes as f64 / 60.0;
+            let session = PokerSession {
+                id: Uuid::new_v4(),
+                user_id: Uuid::new_v4(),
+                session_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+                duration_minutes: minutes,
+                buy_in_amount: BigDecimal::from_f64(100.0).unwrap(),
+                rebuy_amount: BigDecimal::from_f64(0.0).unwrap(),
+                cash_out_amount: BigDecimal::from_f64(100.0).unwrap(),
+                notes: None,
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+            };
+
+            let csv = generate_csv(&[session]);
+            let lines: Vec<&str> = csv.lines().collect();
+
+            // The formatted hours should be close to expected
+            let formatted = format!("{:.1}", expected_hours);
+            prop_assert!(lines[1].contains(&formatted),
+                "Expected {} for {} minutes, line: {}",
+                formatted, minutes, lines[1]);
         }
     }
 }
