@@ -20,10 +20,6 @@ use crate::common::fixtures::test_db;
 use poker_tracker::models::user::{NewUser, User};
 use poker_tracker::schema::users;
 
-// =============================================================================
-// Database Connection Tests
-// =============================================================================
-
 #[rstest]
 #[tokio::test]
 async fn test_database_connection(#[future] test_db: TestDb) {
@@ -32,10 +28,6 @@ async fn test_database_connection(#[future] test_db: TestDb) {
     let result = diesel::select(diesel::dsl::sql::<Integer>("1")).execute(&mut conn);
     assert!(result.is_ok());
 }
-
-// =============================================================================
-// HIGH PRIORITY: Create Session Tests
-// =============================================================================
 
 #[rstest]
 #[tokio::test]
@@ -205,10 +197,6 @@ async fn test_create_session_persists_to_database(#[future] test_db: TestDb) {
     assert_eq!(retrieved.user_id, user.id);
 }
 
-// =============================================================================
-// HIGH PRIORITY: Get Sessions Tests
-// =============================================================================
-
 #[rstest]
 #[tokio::test]
 async fn test_get_sessions_empty(#[future] test_db: TestDb) {
@@ -249,10 +237,6 @@ async fn test_get_sessions_multiple(#[future] test_db: TestDb) {
     assert_eq!(sessions[1].notes, Some("Session 2".to_string()));
     assert_eq!(sessions[2].notes, Some("Session 1".to_string()));
 }
-
-// =============================================================================
-// HIGH PRIORITY: User Isolation Tests
-// =============================================================================
 
 #[rstest]
 #[tokio::test]
@@ -317,10 +301,6 @@ async fn test_create_session_assigns_correct_user(#[future] test_db: TestDb) {
     assert_eq!(session.user_id, user_a.id);
     assert_ne!(session.user_id, user_b.id);
 }
-
-// =============================================================================
-// HIGH PRIORITY: Profit Calculation Tests
-// =============================================================================
 
 #[rstest]
 #[tokio::test]
@@ -496,10 +476,6 @@ async fn test_amounts_stored_correctly(#[future] test_db: TestDb) {
     assert!((cash_out - 234.56).abs() < 0.01);
 }
 
-// =============================================================================
-// MEDIUM PRIORITY: Get Session Tests (Not Found / Authorization)
-// =============================================================================
-
 #[rstest]
 #[tokio::test]
 async fn test_get_session_success(#[future] test_db: TestDb) {
@@ -550,10 +526,6 @@ async fn test_get_session_wrong_user(#[future] test_db: TestDb) {
 
     assert!(matches!(result, Err(GetSessionError::NotFound)));
 }
-
-// =============================================================================
-// MEDIUM PRIORITY: Update Session Tests (Not Found / Authorization / Validation)
-// =============================================================================
 
 #[rstest]
 #[tokio::test]
@@ -703,10 +675,6 @@ async fn test_update_session_invalid_date(#[future] test_db: TestDb) {
     assert!(matches!(result, Err(UpdateSessionError::InvalidDateFormat)));
 }
 
-// =============================================================================
-// MEDIUM PRIORITY: Delete Session Tests (Not Found / Authorization)
-// =============================================================================
-
 #[rstest]
 #[tokio::test]
 async fn test_delete_session_success(#[future] test_db: TestDb) {
@@ -780,43 +748,37 @@ async fn test_delete_session_idempotent(#[future] test_db: TestDb) {
     assert!(matches!(result, Err(DeleteSessionError::NotFound)));
 }
 
-// =============================================================================
-// MEDIUM PRIORITY: Validation Tests
-// =============================================================================
-
 #[rstest]
+#[case("2024/01/15")] // Wrong separator
+#[case("15-01-2024")] // Day-Month-Year
+#[case("Jan 15, 2024")] // Month name
+#[case("2024-13-01")] // Invalid month
+#[case("2024-01-32")] // Invalid day
+#[case("not-a-date")] // Complete garbage
+#[case("")] // Empty string
 #[tokio::test]
-async fn test_create_session_invalid_date_various_formats(#[future] test_db: TestDb) {
+async fn test_create_session_invalid_date_various_formats(
+    #[future] test_db: TestDb,
+    #[case] invalid_date: String,
+) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
-    let invalid_dates = vec![
-        "2024/01/15",   // Wrong separator
-        "15-01-2024",   // Day-Month-Year
-        "Jan 15, 2024", // Month name
-        "2024-13-01",   // Invalid month
-        "2024-01-32",   // Invalid day
-        "not-a-date",   // Complete garbage
-        "",             // Empty string
-    ];
+    let session_req = CreatePokerSessionRequest {
+        session_date: invalid_date.to_string(),
+        duration_minutes: 120,
+        buy_in_amount: 100.0,
+        rebuy_amount: None,
+        cash_out_amount: 150.0,
+        notes: None,
+    };
 
-    for invalid_date in invalid_dates {
-        let session_req = CreatePokerSessionRequest {
-            session_date: invalid_date.to_string(),
-            duration_minutes: 120,
-            buy_in_amount: 100.0,
-            rebuy_amount: None,
-            cash_out_amount: 150.0,
-            notes: None,
-        };
-
-        let result = poker_session::do_create_session(&db, user.id, session_req).await;
-        assert!(
-            matches!(result, Err(CreateSessionError::InvalidDateFormat(_))),
-            "Expected InvalidDateFormat for date: {}",
-            invalid_date
-        );
-    }
+    let result = poker_session::do_create_session(&db, user.id, session_req).await;
+    assert!(
+        matches!(result, Err(CreateSessionError::InvalidDateFormat(_))),
+        "Expected InvalidDateFormat for date: {}",
+        invalid_date
+    );
 }
 
 #[rstest]

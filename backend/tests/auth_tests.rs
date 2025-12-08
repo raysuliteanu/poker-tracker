@@ -6,10 +6,6 @@ use rstest::rstest;
 
 use crate::common::fixtures::test_db;
 
-// =============================================================================
-// HIGH PRIORITY: Registration Tests
-// =============================================================================
-
 #[rstest]
 #[tokio::test]
 async fn test_register_user_success(#[future] test_db: TestDb) {
@@ -114,10 +110,6 @@ async fn test_register_sets_default_cookie_consent(#[future] test_db: TestDb) {
     assert!(!user.cookie_consent);
     assert!(user.cookie_consent_date.is_none());
 }
-
-// =============================================================================
-// HIGH PRIORITY: Login Tests
-// =============================================================================
 
 #[rstest]
 #[tokio::test]
@@ -261,10 +253,6 @@ async fn test_login_password_not_stored_plaintext(#[future] test_db: TestDb) {
     assert!(matches!(result, Err(LoginError::InvalidCredentials)));
 }
 
-// =============================================================================
-// MEDIUM PRIORITY: Validation Error Tests
-// =============================================================================
-
 #[rstest]
 #[tokio::test]
 async fn test_register_empty_email(#[future] test_db: TestDb) {
@@ -350,10 +338,6 @@ async fn test_login_empty_password(#[future] test_db: TestDb) {
 
     assert!(matches!(result, Err(LoginError::InvalidCredentials)));
 }
-
-// =============================================================================
-// MEDIUM PRIORITY: Multiple Users Tests
-// =============================================================================
 
 #[rstest]
 #[tokio::test]
