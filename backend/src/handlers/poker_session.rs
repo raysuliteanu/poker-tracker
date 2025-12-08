@@ -31,6 +31,34 @@ pub enum CreateSessionError {
     Database(#[from] diesel::result::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum GetSessionError {
+    #[error("Database connection error")]
+    DatabaseConnection,
+    #[error("Session not found")]
+    NotFound,
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateSessionError {
+    #[error("Database connection error")]
+    DatabaseConnection,
+    #[error("Session not found")]
+    NotFound,
+    #[error("Invalid date format")]
+    InvalidDateFormat,
+    #[error("Database error: {0}")]
+    Database(#[from] diesel::result::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum DeleteSessionError {
+    #[error("Database connection error")]
+    DatabaseConnection,
+    #[error("Session not found")]
+    NotFound,
+}
+
 pub async fn do_create_session<P>(
     db_provider: &P,
     user_id: Uuid,
@@ -61,6 +89,124 @@ where
     Ok(diesel::insert_into(poker_sessions::table)
         .values(&new_session)
         .get_result::<PokerSession>(&mut conn)?)
+}
+
+/// Business logic for getting a single session - testable with any DbConnectionProvider
+pub fn do_get_session<P>(
+    db_provider: &P,
+    session_id: Uuid,
+    user_id: Uuid,
+) -> Result<PokerSession, GetSessionError>
+where
+    P: DbConnectionProvider,
+    P::Connection:
+        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
+{
+    let mut conn = db_provider
+        .get_connection()
+        .map_err(|_| GetSessionError::DatabaseConnection)?;
+
+    poker_sessions::table
+        .filter(poker_sessions::id.eq(session_id))
+        .filter(poker_sessions::user_id.eq(user_id))
+        .first::<PokerSession>(&mut conn)
+        .map_err(|_| GetSessionError::NotFound)
+}
+
+/// Business logic for updating a session - testable with any DbConnectionProvider
+pub fn do_update_session<P>(
+    db_provider: &P,
+    session_id: Uuid,
+    user_id: Uuid,
+    update_req: UpdatePokerSessionRequest,
+) -> Result<PokerSession, UpdateSessionError>
+where
+    P: DbConnectionProvider,
+    P::Connection:
+        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
+{
+    let mut conn = db_provider
+        .get_connection()
+        .map_err(|_| UpdateSessionError::DatabaseConnection)?;
+
+    // First verify ownership and get existing session
+    let existing_session = poker_sessions::table
+        .filter(poker_sessions::id.eq(session_id))
+        .filter(poker_sessions::user_id.eq(user_id))
+        .first::<PokerSession>(&mut conn)
+        .map_err(|_| UpdateSessionError::NotFound)?;
+
+    // Parse date if provided
+    let session_date = if let Some(date_str) = &update_req.session_date {
+        NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+            .map_err(|_| UpdateSessionError::InvalidDateFormat)?
+    } else {
+        existing_session.session_date
+    };
+
+    let duration_minutes = update_req
+        .duration_minutes
+        .unwrap_or(existing_session.duration_minutes);
+
+    let buy_in_amount = update_req
+        .buy_in_amount
+        .map(|v| BigDecimal::from_f64(v).unwrap())
+        .unwrap_or(existing_session.buy_in_amount);
+
+    let rebuy_amount = update_req
+        .rebuy_amount
+        .map(|v| BigDecimal::from_f64(v).unwrap())
+        .unwrap_or(existing_session.rebuy_amount);
+
+    let cash_out_amount = update_req
+        .cash_out_amount
+        .map(|v| BigDecimal::from_f64(v).unwrap())
+        .unwrap_or(existing_session.cash_out_amount);
+
+    let notes = update_req.notes.clone().or(existing_session.notes);
+
+    diesel::update(poker_sessions::table.find(existing_session.id))
+        .set((
+            poker_sessions::session_date.eq(session_date),
+            poker_sessions::duration_minutes.eq(duration_minutes),
+            poker_sessions::buy_in_amount.eq(buy_in_amount),
+            poker_sessions::rebuy_amount.eq(rebuy_amount),
+            poker_sessions::cash_out_amount.eq(cash_out_amount),
+            poker_sessions::notes.eq(notes),
+            poker_sessions::updated_at.eq(Utc::now().naive_utc()),
+        ))
+        .get_result::<PokerSession>(&mut conn)
+        .map_err(UpdateSessionError::Database)
+}
+
+/// Business logic for deleting a session - testable with any DbConnectionProvider
+pub fn do_delete_session<P>(
+    db_provider: &P,
+    session_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), DeleteSessionError>
+where
+    P: DbConnectionProvider,
+    P::Connection:
+        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
+{
+    let mut conn = db_provider
+        .get_connection()
+        .map_err(|_| DeleteSessionError::DatabaseConnection)?;
+
+    let count = diesel::delete(
+        poker_sessions::table
+            .filter(poker_sessions::id.eq(session_id))
+            .filter(poker_sessions::user_id.eq(user_id)),
+    )
+    .execute(&mut conn)
+    .map_err(|_| DeleteSessionError::NotFound)?;
+
+    if count > 0 {
+        Ok(())
+    } else {
+        Err(DeleteSessionError::NotFound)
+    }
 }
 
 pub async fn create_session(
@@ -146,24 +292,7 @@ pub async fn get_session(
     Extension(user_id): Extension<Uuid>,
     Path(session_id): Path<Uuid>,
 ) -> Response {
-    let mut conn = match state.db_pool.get() {
-        Ok(conn) => conn,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({
-                    "error": "Database connection failed"
-                })),
-            )
-                .into_response();
-        }
-    };
-
-    match poker_sessions::table
-        .filter(poker_sessions::id.eq(session_id))
-        .filter(poker_sessions::user_id.eq(user_id))
-        .first::<PokerSession>(&mut conn)
-    {
+    match do_get_session(&state.db_pool, session_id, user_id) {
         Ok(session) => {
             let profit = calculate_profit(
                 &session.buy_in_amount,
@@ -172,7 +301,14 @@ pub async fn get_session(
             );
             (StatusCode::OK, Json(SessionWithProfit { session, profit })).into_response()
         }
-        Err(_) => (
+        Err(GetSessionError::DatabaseConnection) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Database connection failed"
+            })),
+        )
+            .into_response(),
+        Err(GetSessionError::NotFound) => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({
                 "error": "Session not found"
@@ -188,89 +324,30 @@ pub async fn update_session(
     Path(session_id): Path<Uuid>,
     Json(update_req): Json<UpdatePokerSessionRequest>,
 ) -> Response {
-    let mut conn = match state.db_pool.get() {
-        Ok(conn) => conn,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({
-                    "error": "Database connection failed"
-                })),
-            )
-                .into_response();
-        }
-    };
-
-    // Verify ownership
-    let existing_session = match poker_sessions::table
-        .filter(poker_sessions::id.eq(session_id))
-        .filter(poker_sessions::user_id.eq(user_id))
-        .first::<PokerSession>(&mut conn)
-    {
-        Ok(s) => s,
-        Err(_) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({
-                    "error": "Session not found"
-                })),
-            )
-                .into_response();
-        }
-    };
-
-    let session_date = if let Some(date_str) = &update_req.session_date {
-        match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-            Ok(date) => date,
-            Err(_) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(serde_json::json!({
-                        "error": "Invalid date format. Expected YYYY-MM-DD"
-                    })),
-                )
-                    .into_response();
-            }
-        }
-    } else {
-        existing_session.session_date
-    };
-
-    let duration_minutes = update_req
-        .duration_minutes
-        .unwrap_or(existing_session.duration_minutes);
-
-    let buy_in_amount = update_req
-        .buy_in_amount
-        .map(|v| BigDecimal::from_f64(v).unwrap())
-        .unwrap_or(existing_session.buy_in_amount);
-
-    let rebuy_amount = update_req
-        .rebuy_amount
-        .map(|v| BigDecimal::from_f64(v).unwrap())
-        .unwrap_or(existing_session.rebuy_amount);
-
-    let cash_out_amount = update_req
-        .cash_out_amount
-        .map(|v| BigDecimal::from_f64(v).unwrap())
-        .unwrap_or(existing_session.cash_out_amount);
-
-    let notes = update_req.notes.clone().or(existing_session.notes);
-
-    match diesel::update(poker_sessions::table.find(existing_session.id))
-        .set((
-            poker_sessions::session_date.eq(session_date),
-            poker_sessions::duration_minutes.eq(duration_minutes),
-            poker_sessions::buy_in_amount.eq(buy_in_amount),
-            poker_sessions::rebuy_amount.eq(rebuy_amount),
-            poker_sessions::cash_out_amount.eq(cash_out_amount),
-            poker_sessions::notes.eq(notes),
-            poker_sessions::updated_at.eq(Utc::now().naive_utc()),
-        ))
-        .get_result::<PokerSession>(&mut conn)
-    {
+    match do_update_session(&state.db_pool, session_id, user_id, update_req) {
         Ok(session) => (StatusCode::OK, Json(session)).into_response(),
-        Err(_) => (
+        Err(UpdateSessionError::DatabaseConnection) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": "Database connection failed"
+            })),
+        )
+            .into_response(),
+        Err(UpdateSessionError::NotFound) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": "Session not found"
+            })),
+        )
+            .into_response(),
+        Err(UpdateSessionError::InvalidDateFormat) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Invalid date format. Expected YYYY-MM-DD"
+            })),
+        )
+            .into_response(),
+        Err(UpdateSessionError::Database(_)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
                 "error": "Failed to update session"
@@ -285,44 +362,25 @@ pub async fn delete_session(
     Extension(user_id): Extension<Uuid>,
     Path(session_id): Path<Uuid>,
 ) -> Response {
-    let mut conn = match state.db_pool.get() {
-        Ok(conn) => conn,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({
-                    "error": "Database connection failed"
-                })),
-            )
-                .into_response();
-        }
-    };
-
-    match diesel::delete(
-        poker_sessions::table
-            .filter(poker_sessions::id.eq(session_id))
-            .filter(poker_sessions::user_id.eq(user_id)),
-    )
-    .execute(&mut conn)
-    {
-        Ok(count) if count > 0 => (
+    match do_delete_session(&state.db_pool, session_id, user_id) {
+        Ok(()) => (
             StatusCode::OK,
             Json(serde_json::json!({
                 "message": "Session deleted successfully"
             })),
         )
             .into_response(),
-        Ok(_) => (
-            StatusCode::NOT_FOUND,
+        Err(DeleteSessionError::DatabaseConnection) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
-                "error": "Session not found"
+                "error": "Database connection failed"
             })),
         )
             .into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
+        Err(DeleteSessionError::NotFound) => (
+            StatusCode::NOT_FOUND,
             Json(serde_json::json!({
-                "error": "Failed to delete session"
+                "error": "Session not found"
             })),
         )
             .into_response(),
