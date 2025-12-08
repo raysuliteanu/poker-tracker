@@ -30,3 +30,7 @@ jobs:
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   working-directory: backend
+                  # Ignore RUSTSEC-2025-0134: rustls-pemfile unmaintained warning
+                  # This is a dev-dependency via testcontainers->bollard
+                  # Waiting for bollard to migrate to rustls-pki-types
+                  ignore: RUSTSEC-2025-0134

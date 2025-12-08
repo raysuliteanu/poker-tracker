@@ -37,5 +37,5 @@ thiserror = "2.0.17"
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rstest = "0.26.1"
-testcontainers = "0.25.2"
-testcontainers-modules = { version = "0.13.0", features = ["postgres"] }
+testcontainers = "0.26.0"
+testcontainers-modules = { version = "0.14.0", features = ["postgres"] }
