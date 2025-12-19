@@ -226,7 +226,14 @@ pub async fn create_session(
     }
 
     match do_create_session(&state.db_pool, user_id, session_req).await {
-        Ok(session) => (StatusCode::CREATED, Json(session)).into_response(),
+        Ok(session) => {
+            let profit = calculate_profit(
+                &session.buy_in_amount,
+                &session.rebuy_amount,
+                &session.cash_out_amount,
+            );
+            (StatusCode::CREATED, Json(SessionWithProfit { session, profit })).into_response()
+        }
         Err(CreateSessionError::InvalidDateFormat(msg)) => (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
@@ -325,7 +332,14 @@ pub async fn update_session(
     Json(update_req): Json<UpdatePokerSessionRequest>,
 ) -> Response {
     match do_update_session(&state.db_pool, session_id, user_id, update_req) {
-        Ok(session) => (StatusCode::OK, Json(session)).into_response(),
+        Ok(session) => {
+            let profit = calculate_profit(
+                &session.buy_in_amount,
+                &session.rebuy_amount,
+                &session.cash_out_amount,
+            );
+            (StatusCode::OK, Json(SessionWithProfit { session, profit })).into_response()
+        }
         Err(UpdateSessionError::DatabaseConnection) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({

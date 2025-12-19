@@ -55,7 +55,7 @@ pub struct UpdatePokerSessionRequest {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SessionWithProfit {
     #[serde(flatten)]
     pub session: PokerSession,

@@ -50,6 +50,15 @@ impl TestDb {
 
         Ok(())
     }
+
+    /// Create a connection pool from this test database
+    pub fn create_pool(&self) -> poker_tracker::utils::DbPool {
+        use diesel::r2d2::{ConnectionManager, Pool};
+        let manager = ConnectionManager::<PgConnection>::new(&self.database_url);
+        Pool::builder()
+            .build(manager)
+            .expect("Failed to create test database pool")
+    }
 }
 
 impl poker_tracker::utils::DbConnectionProvider for TestDb {

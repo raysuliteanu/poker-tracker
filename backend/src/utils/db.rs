@@ -3,7 +3,6 @@ use diesel::r2d2::{self, ConnectionManager, Pool, PooledConnection};
 use std::env;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
-#[allow(dead_code)]
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 /// Trait for providing database connections
@@ -18,7 +17,7 @@ pub trait DbConnectionProvider {
 
 /// Production implementation using a connection pool
 impl DbConnectionProvider for DbPool {
-    type Connection = PooledConnection<ConnectionManager<PgConnection>>;
+    type Connection = DbConnection;
     type Error = r2d2::PoolError;
 
     fn get_connection(&self) -> Result<Self::Connection, Self::Error> {

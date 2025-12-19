@@ -19,6 +19,8 @@ use utils::establish_connection_pool;
 use diesel::RunQueryDsl;
 use diesel::sql_types::Integer;
 
+use crate::{handlers, middleware, utils};
+
 // this method is called from the /api/health route, via Axum
 // I guess clippy can't deduce that
 #[allow(dead_code)]
@@ -44,15 +46,49 @@ async fn health(State(state): State<Arc<AppState>>) -> Response {
     }
 }
 
-use crate::handlers;
-use crate::middleware;
-use crate::utils;
-
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 // Shared application state
 pub struct AppState {
     pub db_pool: utils::DbPool,
+}
+
+/// Create the application router with the given state.
+/// Extracted for testability with axum-test.
+pub fn create_app_router(state: Arc<AppState>) -> Router {
+    // Configure CORS
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .max_age(std::time::Duration::from_secs(3600));
+
+    Router::new()
+        .route("/api/health", get(health))
+        // Public auth routes
+        .route("/api/auth/register", post(auth::register))
+        .route("/api/auth/login", post(auth::login))
+        // Protected auth routes
+        .route("/api/auth/me", get(auth::get_me))
+        .route("/api/auth/cookie-consent", put(auth::update_cookie_consent))
+        .route("/api/auth/change-password", post(auth::change_password))
+        // Protected session routes
+        .route(
+            "/api/sessions",
+            post(poker_session::create_session).get(poker_session::get_sessions),
+        )
+        .route("/api/sessions/export", get(poker_session::export_sessions))
+        .route(
+            "/api/sessions/{id}",
+            get(poker_session::get_session)
+                .put(poker_session::update_session)
+                .delete(poker_session::delete_session),
+        )
+        // Apply middleware
+        .layer(AuthLayer::new())
+        .layer(cors)
+        .layer(TraceLayer::new_for_http())
+        .with_state(state)
 }
 
 pub struct PokerTrackerApp;
@@ -79,40 +115,8 @@ impl PokerTrackerApp {
         // Create shared application state
         let state = Arc::new(AppState { db_pool: pool });
 
-        // Configure CORS
-        let cors = CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods(Any)
-            .allow_headers(Any)
-            .max_age(std::time::Duration::from_secs(3600));
-
-        // Build the router
-        let app = Router::new()
-            .route("/api/health", get(health))
-            // Public auth routes
-            .route("/api/auth/register", post(auth::register))
-            .route("/api/auth/login", post(auth::login))
-            // Protected auth routes
-            .route("/api/auth/me", get(auth::get_me))
-            .route("/api/auth/cookie-consent", put(auth::update_cookie_consent))
-            .route("/api/auth/change-password", post(auth::change_password))
-            // Protected session routes
-            .route(
-                "/api/sessions",
-                post(poker_session::create_session).get(poker_session::get_sessions),
-            )
-            .route("/api/sessions/export", get(poker_session::export_sessions))
-            .route(
-                "/api/sessions/{id}",
-                get(poker_session::get_session)
-                    .put(poker_session::update_session)
-                    .delete(poker_session::delete_session),
-            )
-            // Apply middleware
-            .layer(AuthLayer::new())
-            .layer(cors)
-            .layer(TraceLayer::new_for_http())
-            .with_state(state);
+        // Build the router using the extracted function
+        let app = create_app_router(state);
 
         // Parse bind address
         let addr: SocketAddr = bind_address
