@@ -1,48 +1,22 @@
 use diesel::pg::PgConnection;
 use diesel::r2d2::{self, ConnectionManager, Pool, PooledConnection};
 use std::env;
-use std::sync::Arc;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
-/// Trait for providing database connections
-/// This allows us to use both pooled connections (in production)
-/// and direct connections (in tests) with the same handler code
-pub trait DbConnectionProvider {
-    type Connection;
-    type Error;
-
-    fn get_connection(&self) -> Result<Self::Connection, Self::Error>;
-}
-
-/// Production implementation using a connection pool
-impl DbConnectionProvider for DbPool {
-    type Connection = DbConnection;
-    type Error = r2d2::PoolError;
-
-    fn get_connection(&self) -> Result<Self::Connection, Self::Error> {
-        self.get()
-    }
-}
-
-pub trait PooledConnectionProvider: Send + Sync {
+/// Trait for providing database connections.
+/// Returns pooled connections with boxed errors for maximum flexibility.
+/// Used by both production code and tests.
+pub trait DbProvider: Send + Sync {
     fn get_connection(&self) -> Result<DbConnection, Box<dyn std::error::Error + Send + Sync>>;
 }
 
-impl PooledConnectionProvider for DbPool {
+/// Production implementation using a connection pool
+impl DbProvider for DbPool {
     fn get_connection(&self) -> Result<DbConnection, Box<dyn std::error::Error + Send + Sync>> {
         self.get()
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-    }
-}
-
-impl DbConnectionProvider for Arc<dyn PooledConnectionProvider> {
-    type Connection = DbConnection;
-    type Error = Box<dyn std::error::Error + Send + Sync>;
-
-    fn get_connection(&self) -> Result<Self::Connection, Self::Error> {
-        (**self).get_connection()
     }
 }
 

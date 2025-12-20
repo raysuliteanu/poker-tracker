@@ -22,8 +22,6 @@ use diesel::sql_types::Integer;
 use crate::{handlers, middleware, utils};
 
 // this method is called from the /api/health route, via Axum
-// I guess clippy can't deduce that
-#[allow(dead_code)]
 async fn health(State(state): State<Arc<AppState>>) -> Response {
     if let Ok(mut conn) = state.db_provider.get_connection()
         && let Ok(_) = diesel::select(diesel::dsl::sql::<Integer>("1")).execute(&mut conn)
@@ -50,11 +48,10 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 // Shared application state
 pub struct AppState {
-    pub db_provider: Arc<dyn utils::PooledConnectionProvider>,
+    pub db_provider: Arc<dyn utils::DbProvider>,
 }
 
 /// Create the application router with the given state.
-/// Extracted for testability with axum-test.
 pub fn create_app_router(state: Arc<AppState>) -> Router {
     // Configure CORS
     let cors = CorsLayer::new()

@@ -1,6 +1,6 @@
 mod common;
 
-use common::TestDb;
+use common::DirectConnectionTestDb;
 use poker_tracker::handlers::auth::{LoginError, RegisterError, do_login, do_register};
 use rstest::rstest;
 
@@ -8,7 +8,7 @@ use crate::common::fixtures::test_db;
 
 #[rstest]
 #[tokio::test]
-async fn test_register_user_success(#[future] test_db: TestDb) {
+async fn test_register_user_success(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let user = do_register(
@@ -28,7 +28,7 @@ async fn test_register_user_success(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_duplicate_email(#[future] test_db: TestDb) {
+async fn test_register_duplicate_email(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // First registration should succeed
@@ -53,7 +53,7 @@ async fn test_register_duplicate_email(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_duplicate_username(#[future] test_db: TestDb) {
+async fn test_register_duplicate_username(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // First registration should succeed
@@ -78,7 +78,7 @@ async fn test_register_duplicate_username(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_returns_valid_user_id(#[future] test_db: TestDb) {
+async fn test_register_returns_valid_user_id(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let user = do_register(
@@ -95,7 +95,7 @@ async fn test_register_returns_valid_user_id(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_sets_default_cookie_consent(#[future] test_db: TestDb) {
+async fn test_register_sets_default_cookie_consent(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let user = do_register(
@@ -113,7 +113,7 @@ async fn test_register_sets_default_cookie_consent(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_success(#[future] test_db: TestDb) {
+async fn test_login_success(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // First register a user
@@ -140,7 +140,7 @@ async fn test_login_success(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_wrong_password(#[future] test_db: TestDb) {
+async fn test_login_wrong_password(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // First register a user
@@ -164,7 +164,7 @@ async fn test_login_wrong_password(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_nonexistent_user(#[future] test_db: TestDb) {
+async fn test_login_nonexistent_user(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Try login with non-existent email
@@ -179,7 +179,7 @@ async fn test_login_nonexistent_user(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_after_registration_flow(#[future] test_db: TestDb) {
+async fn test_login_after_registration_flow(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Test the full registration -> login flow
@@ -199,7 +199,7 @@ async fn test_login_after_registration_flow(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_case_sensitive_email(#[future] test_db: TestDb) {
+async fn test_login_case_sensitive_email(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Register with lowercase email
@@ -224,7 +224,7 @@ async fn test_login_case_sensitive_email(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_password_not_stored_plaintext(#[future] test_db: TestDb) {
+async fn test_login_password_not_stored_plaintext(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let password = "mySecretPassword123";
@@ -255,7 +255,7 @@ async fn test_login_password_not_stored_plaintext(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_empty_email(#[future] test_db: TestDb) {
+async fn test_register_empty_email(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Empty email should still work at the do_register level (validation happens in handler)
@@ -277,7 +277,7 @@ async fn test_register_empty_email(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_empty_username(#[future] test_db: TestDb) {
+async fn test_register_empty_username(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let result = do_register(
@@ -293,7 +293,7 @@ async fn test_register_empty_username(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_empty_password(#[future] test_db: TestDb) {
+async fn test_register_empty_password(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Empty password should still hash successfully with bcrypt
@@ -310,7 +310,7 @@ async fn test_register_empty_password(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_empty_email(#[future] test_db: TestDb) {
+async fn test_login_empty_email(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Login with empty email should fail (no user found)
@@ -321,7 +321,7 @@ async fn test_login_empty_email(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_login_empty_password(#[future] test_db: TestDb) {
+async fn test_login_empty_password(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // First register a user with a real password
@@ -341,7 +341,7 @@ async fn test_login_empty_password(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_multiple_users_independent_login(#[future] test_db: TestDb) {
+async fn test_multiple_users_independent_login(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Register multiple users
@@ -389,7 +389,7 @@ async fn test_multiple_users_independent_login(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_register_same_email_different_username_fails(#[future] test_db: TestDb) {
+async fn test_register_same_email_different_username_fails(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     do_register(
@@ -412,7 +412,7 @@ async fn test_register_same_email_different_username_fails(#[future] test_db: Te
 
 #[rstest]
 #[tokio::test]
-async fn test_register_same_username_different_email_fails(#[future] test_db: TestDb) {
+async fn test_register_same_username_different_email_fails(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     do_register(

@@ -19,7 +19,7 @@ use crate::models::{
     UpdatePokerSessionRequest, calculate_profit,
 };
 use crate::schema::poker_sessions;
-use crate::utils::DbConnectionProvider;
+use crate::utils::DbProvider;
 
 #[derive(Debug, Error)]
 pub enum CreateSessionError {
@@ -59,16 +59,11 @@ pub enum DeleteSessionError {
     NotFound,
 }
 
-pub async fn do_create_session<P>(
-    db_provider: &P,
+pub async fn do_create_session(
+    db_provider: &dyn DbProvider,
     user_id: Uuid,
     session_req: CreatePokerSessionRequest,
-) -> Result<PokerSession, CreateSessionError>
-where
-    P: DbConnectionProvider,
-    P::Connection:
-        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
-{
+) -> Result<PokerSession, CreateSessionError> {
     let session_date = NaiveDate::parse_from_str(&session_req.session_date, "%Y-%m-%d")
         .map_err(|e| CreateSessionError::InvalidDateFormat(e.to_string()))?;
 
@@ -91,17 +86,12 @@ where
         .get_result::<PokerSession>(&mut conn)?)
 }
 
-/// Business logic for getting a single session - testable with any DbConnectionProvider
-pub fn do_get_session<P>(
-    db_provider: &P,
+/// Business logic for getting a single session
+pub fn do_get_session(
+    db_provider: &dyn DbProvider,
     session_id: Uuid,
     user_id: Uuid,
-) -> Result<PokerSession, GetSessionError>
-where
-    P: DbConnectionProvider,
-    P::Connection:
-        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
-{
+) -> Result<PokerSession, GetSessionError> {
     let mut conn = db_provider
         .get_connection()
         .map_err(|_| GetSessionError::DatabaseConnection)?;
@@ -113,18 +103,13 @@ where
         .map_err(|_| GetSessionError::NotFound)
 }
 
-/// Business logic for updating a session - testable with any DbConnectionProvider
-pub fn do_update_session<P>(
-    db_provider: &P,
+/// Business logic for updating a session
+pub fn do_update_session(
+    db_provider: &dyn DbProvider,
     session_id: Uuid,
     user_id: Uuid,
     update_req: UpdatePokerSessionRequest,
-) -> Result<PokerSession, UpdateSessionError>
-where
-    P: DbConnectionProvider,
-    P::Connection:
-        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
-{
+) -> Result<PokerSession, UpdateSessionError> {
     let mut conn = db_provider
         .get_connection()
         .map_err(|_| UpdateSessionError::DatabaseConnection)?;
@@ -179,17 +164,12 @@ where
         .map_err(UpdateSessionError::Database)
 }
 
-/// Business logic for deleting a session - testable with any DbConnectionProvider
-pub fn do_delete_session<P>(
-    db_provider: &P,
+/// Business logic for deleting a session
+pub fn do_delete_session(
+    db_provider: &dyn DbProvider,
     session_id: Uuid,
     user_id: Uuid,
-) -> Result<(), DeleteSessionError>
-where
-    P: DbConnectionProvider,
-    P::Connection:
-        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
-{
+) -> Result<(), DeleteSessionError> {
     let mut conn = db_provider
         .get_connection()
         .map_err(|_| DeleteSessionError::DatabaseConnection)?;
@@ -225,14 +205,18 @@ pub async fn create_session(
             .into_response();
     }
 
-    match do_create_session(&state.db_provider, user_id, session_req).await {
+    match do_create_session(state.db_provider.as_ref(), user_id, session_req).await {
         Ok(session) => {
             let profit = calculate_profit(
                 &session.buy_in_amount,
                 &session.rebuy_amount,
                 &session.cash_out_amount,
             );
-            (StatusCode::CREATED, Json(SessionWithProfit { session, profit })).into_response()
+            (
+                StatusCode::CREATED,
+                Json(SessionWithProfit { session, profit }),
+            )
+                .into_response()
         }
         Err(CreateSessionError::InvalidDateFormat(msg)) => (
             StatusCode::BAD_REQUEST,
@@ -299,7 +283,7 @@ pub async fn get_session(
     Extension(user_id): Extension<Uuid>,
     Path(session_id): Path<Uuid>,
 ) -> Response {
-    match do_get_session(&state.db_provider, session_id, user_id) {
+    match do_get_session(state.db_provider.as_ref(), session_id, user_id) {
         Ok(session) => {
             let profit = calculate_profit(
                 &session.buy_in_amount,
@@ -331,7 +315,7 @@ pub async fn update_session(
     Path(session_id): Path<Uuid>,
     Json(update_req): Json<UpdatePokerSessionRequest>,
 ) -> Response {
-    match do_update_session(&state.db_provider, session_id, user_id, update_req) {
+    match do_update_session(state.db_provider.as_ref(), session_id, user_id, update_req) {
         Ok(session) => {
             let profit = calculate_profit(
                 &session.buy_in_amount,
@@ -376,7 +360,7 @@ pub async fn delete_session(
     Extension(user_id): Extension<Uuid>,
     Path(session_id): Path<Uuid>,
 ) -> Response {
-    match do_delete_session(&state.db_provider, session_id, user_id) {
+    match do_delete_session(state.db_provider.as_ref(), session_id, user_id) {
         Ok(()) => (
             StatusCode::OK,
             Json(serde_json::json!({

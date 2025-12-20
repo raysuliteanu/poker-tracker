@@ -3,28 +3,27 @@
 use bcrypt::{DEFAULT_COST, hash};
 use diesel::PgConnection;
 use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
 use poker_tracker::models::user::{NewUser, User};
 use poker_tracker::models::{CreatePokerSessionRequest, PokerSession};
 use poker_tracker::schema::{poker_sessions, users};
-use poker_tracker::utils::DbConnectionProvider;
+use poker_tracker::utils::{DbConnection, DbPool, DbProvider};
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
 use uuid::Uuid;
 
-/// A struct that manages a temporary PostgreSQL container and its connection URL.
-pub struct TestDb {
-    pub database_url: String,
-    // The container handle must be held for the database to stay alive
+/// A struct that manages a temporary PostgreSQL container.
+/// Shared infrastructure for both test database types.
+struct TestContainer {
+    database_url: String,
     #[expect(dead_code)]
     container: ContainerAsync<Postgres>,
-    // Internal pool for AppDbProvider implementation
-    pool: poker_tracker::utils::DbPool,
 }
 
-impl TestDb {
-    /// Starts a new Postgres container, runs migrations, and returns the setup.
-    pub async fn new() -> Self {
+impl TestContainer {
+    /// Starts a new Postgres container and runs migrations.
+    async fn new() -> Self {
         let container = Postgres::default().start().await.unwrap();
 
         let host = container.get_host().await.unwrap();
@@ -34,19 +33,11 @@ impl TestDb {
             host, host_port
         );
 
-        TestDb::run_migrations(&database_url).expect("Failed to run migrations on test DB");
-
-        // Create connection pool for AppDbProvider
-        use diesel::r2d2::{ConnectionManager, Pool};
-        let manager = ConnectionManager::<PgConnection>::new(&database_url);
-        let pool = Pool::builder()
-            .build(manager)
-            .expect("Failed to create test database pool");
+        Self::run_migrations(&database_url).expect("Failed to run migrations on test DB");
 
         Self {
             database_url,
             container,
-            pool,
         }
     }
 
@@ -54,7 +45,6 @@ impl TestDb {
     fn run_migrations(url: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
         use diesel_migrations::{MigrationHarness, embed_migrations};
 
-        // You must have a `migrations` directory in your project root
         const MIGRATIONS: diesel_migrations::EmbeddedMigrations = embed_migrations!();
 
         let mut connection = PgConnection::establish(url)?;
@@ -64,19 +54,60 @@ impl TestDb {
     }
 }
 
-impl poker_tracker::utils::DbConnectionProvider for TestDb {
-    type Connection = PgConnection;
-    type Error = diesel::ConnectionError;
+/// Test database for tests that creates fresh single-connection pools.
+/// Each connection request creates an ephemeral pool to return the expected type.
+pub struct DirectConnectionTestDb {
+    container: TestContainer,
+}
 
-    fn get_connection(&self) -> Result<Self::Connection, Self::Error> {
-        PgConnection::establish(&self.database_url)
+impl DirectConnectionTestDb {
+    pub async fn new() -> Self {
+        Self {
+            container: TestContainer::new().await,
+        }
+    }
+
+    pub fn database_url(&self) -> &str {
+        &self.container.database_url
     }
 }
 
-impl poker_tracker::utils::PooledConnectionProvider for TestDb {
-    fn get_connection(
-        &self,
-    ) -> Result<poker_tracker::utils::DbConnection, Box<dyn std::error::Error + Send + Sync>> {
+impl DbProvider for DirectConnectionTestDb {
+    fn get_connection(&self) -> Result<DbConnection, Box<dyn std::error::Error + Send + Sync>> {
+        // Create ephemeral single-connection pool
+        let manager = ConnectionManager::new(&self.container.database_url);
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(manager)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+
+        pool.get()
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+    }
+}
+
+/// Test database for HTTP tests that maintains a proper connection pool.
+/// Matches production behavior for HTTP-based (axum-test) integration testing.
+pub struct PooledConnectionTestDb {
+    #[expect(dead_code)]
+    container: TestContainer,
+    pool: DbPool,
+}
+
+impl PooledConnectionTestDb {
+    pub async fn new() -> Self {
+        let container = TestContainer::new().await;
+        let manager = ConnectionManager::new(&container.database_url);
+        let pool = Pool::builder()
+            .build(manager)
+            .expect("Failed to create test database pool");
+
+        Self { container, pool }
+    }
+}
+
+impl DbProvider for PooledConnectionTestDb {
+    fn get_connection(&self) -> Result<DbConnection, Box<dyn std::error::Error + Send + Sync>> {
         self.pool
             .get()
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
@@ -84,7 +115,7 @@ impl poker_tracker::utils::PooledConnectionProvider for TestDb {
 }
 
 /// Helper to create a test user directly in the database (without password hashing)
-pub fn create_test_user_raw(db: &TestDb, email: &str, username: &str) -> User {
+pub fn create_test_user_raw(db: &dyn DbProvider, email: &str, username: &str) -> User {
     let mut conn = db.get_connection().expect("Failed to get db connection");
     let new_user = NewUser {
         email: email.to_string(),
@@ -100,7 +131,7 @@ pub fn create_test_user_raw(db: &TestDb, email: &str, username: &str) -> User {
 
 /// Helper to create a test user with a properly hashed password
 pub fn create_test_user_with_password(
-    db: &TestDb,
+    db: &dyn DbProvider,
     email: &str,
     username: &str,
     password: &str,
@@ -120,7 +151,7 @@ pub fn create_test_user_with_password(
 }
 
 /// Helper to get a user by email
-pub fn get_user_by_email(db: &TestDb, email: &str) -> Option<User> {
+pub fn get_user_by_email(db: &dyn DbProvider, email: &str) -> Option<User> {
     let mut conn = db.get_connection().expect("Failed to get db connection");
     users::table
         .filter(users::email.eq(email))
@@ -129,7 +160,7 @@ pub fn get_user_by_email(db: &TestDb, email: &str) -> Option<User> {
 }
 
 /// Helper to get a user by ID
-pub fn get_user_by_id(db: &TestDb, user_id: Uuid) -> Option<User> {
+pub fn get_user_by_id(db: &dyn DbProvider, user_id: Uuid) -> Option<User> {
     let mut conn = db.get_connection().expect("Failed to get db connection");
     users::table.find(user_id).first::<User>(&mut conn).ok()
 }
@@ -147,7 +178,7 @@ pub fn default_session_request() -> CreatePokerSessionRequest {
 }
 
 /// Helper to get all sessions for a user
-pub fn get_sessions_for_user(db: &TestDb, user_id: Uuid) -> Vec<PokerSession> {
+pub fn get_sessions_for_user(db: &dyn DbProvider, user_id: Uuid) -> Vec<PokerSession> {
     let mut conn = db.get_connection().expect("Failed to get db connection");
     poker_sessions::table
         .filter(poker_sessions::user_id.eq(user_id))
@@ -157,7 +188,7 @@ pub fn get_sessions_for_user(db: &TestDb, user_id: Uuid) -> Vec<PokerSession> {
 }
 
 /// Helper to get a session by ID
-pub fn get_session_by_id(db: &TestDb, session_id: Uuid) -> Option<PokerSession> {
+pub fn get_session_by_id(db: &dyn DbProvider, session_id: Uuid) -> Option<PokerSession> {
     let mut conn = db.get_connection().expect("Failed to get db connection");
     poker_sessions::table
         .find(session_id)
@@ -166,7 +197,7 @@ pub fn get_session_by_id(db: &TestDb, session_id: Uuid) -> Option<PokerSession> 
 }
 
 /// Helper to delete a session by ID (returns number of rows deleted)
-pub fn delete_session_by_id(db: &TestDb, session_id: Uuid, user_id: Uuid) -> usize {
+pub fn delete_session_by_id(db: &dyn DbProvider, session_id: Uuid, user_id: Uuid) -> usize {
     let mut conn = db.get_connection().expect("Failed to get db connection");
     diesel::delete(
         poker_sessions::table
@@ -178,11 +209,11 @@ pub fn delete_session_by_id(db: &TestDb, session_id: Uuid, user_id: Uuid) -> usi
 }
 
 pub(crate) mod fixtures {
-    use crate::common::TestDb;
+    use crate::common::DirectConnectionTestDb;
     use rstest::fixture;
 
     #[fixture]
-    pub async fn test_db() -> TestDb {
-        TestDb::new().await
+    pub async fn test_db() -> DirectConnectionTestDb {
+        DirectConnectionTestDb::new().await
     }
 }

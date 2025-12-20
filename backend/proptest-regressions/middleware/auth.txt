@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 782c32d6f2d4ac1ffbe05386aee6fd6e033af6ac6092dc73150c54b59e5fbcec # shrinks to _dummy = 69
+cc 1bd1c4bfa5901cd9d204f3d24b14d1c81c3222a45439699b57baa8e2defd6fa7 # shrinks to _dummy = 1

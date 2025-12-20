@@ -18,7 +18,7 @@ use crate::models::{
     UpdateCookieConsent, User,
 };
 use crate::schema::users;
-use crate::utils::{DbConnectionProvider, create_jwt};
+use crate::utils::{DbProvider, create_jwt};
 
 #[derive(Debug, Error)]
 pub enum RegisterError {
@@ -44,18 +44,13 @@ pub enum LoginError {
     InvalidCredentials,
 }
 
-/// Business logic for user registration - testable with any DbConnectionProvider
-pub fn do_register<P>(
-    db_provider: &P,
+/// Business logic for user registration
+pub fn do_register(
+    db_provider: &dyn DbProvider,
     email: String,
     username: String,
     password: String,
-) -> Result<User, RegisterError>
-where
-    P: DbConnectionProvider,
-    P::Connection:
-        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
-{
+) -> Result<User, RegisterError> {
     let password_hash = hash(&password, DEFAULT_COST).map_err(|_| RegisterError::PasswordHash)?;
 
     let new_user = NewUser {
@@ -89,13 +84,12 @@ where
         })
 }
 
-/// Business logic for user login - testable with any DbConnectionProvider
-pub fn do_login<P>(db_provider: &P, email: String, password: String) -> Result<User, LoginError>
-where
-    P: DbConnectionProvider,
-    P::Connection:
-        diesel::Connection<Backend = diesel::pg::Pg> + diesel::connection::LoadConnection,
-{
+/// Business logic for user login
+pub fn do_login(
+    db_provider: &dyn DbProvider,
+    email: String,
+    password: String,
+) -> Result<User, LoginError> {
     let mut conn = db_provider
         .get_connection()
         .map_err(|_| LoginError::DatabaseConnection)?;
@@ -127,7 +121,12 @@ pub async fn register(
             .into_response();
     }
 
-    let user = match do_register(&state.db_provider, req.email, req.username, req.password) {
+    let user = match do_register(
+        state.db_provider.as_ref(),
+        req.email,
+        req.username,
+        req.password,
+    ) {
         Ok(u) => u,
         Err(RegisterError::PasswordHash) => {
             return (
@@ -204,7 +203,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequ
             .into_response();
     }
 
-    let user = match do_login(&state.db_provider, req.email, req.password) {
+    let user = match do_login(state.db_provider.as_ref(), req.email, req.password) {
         Ok(u) => u,
         Err(LoginError::DatabaseConnection) => {
             return (

@@ -2,7 +2,7 @@ mod common;
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use common::{
-    TestDb, create_test_user_raw, default_session_request, get_session_by_id, get_sessions_for_user,
+    DirectConnectionTestDb, create_test_user_raw, default_session_request, get_session_by_id, get_sessions_for_user,
 };
 use diesel::{prelude::*, sql_types::Integer};
 use poker_tracker::handlers::poker_session::{
@@ -11,7 +11,7 @@ use poker_tracker::handlers::poker_session::{
 use poker_tracker::models::{
     CreatePokerSessionRequest, UpdatePokerSessionRequest, calculate_profit,
 };
-use poker_tracker::utils::DbConnectionProvider;
+use poker_tracker::utils::DbProvider;
 use rstest::rstest;
 use uuid::Uuid;
 
@@ -22,7 +22,7 @@ use poker_tracker::schema::users;
 
 #[rstest]
 #[tokio::test]
-async fn test_database_connection(#[future] test_db: TestDb) {
+async fn test_database_connection(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let mut conn = db.get_connection().expect("Failed to get db connection");
     let result = diesel::select(diesel::dsl::sql::<Integer>("1")).execute(&mut conn);
@@ -31,7 +31,7 @@ async fn test_database_connection(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session(#[future] test_db: TestDb) {
+async fn test_create_session(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Create a test user using the db connection provider
@@ -70,7 +70,7 @@ async fn test_create_session(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_minimal(#[future] test_db: TestDb) {
+async fn test_create_session_minimal(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -96,7 +96,7 @@ async fn test_create_session_minimal(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_with_rebuy(#[future] test_db: TestDb) {
+async fn test_create_session_with_rebuy(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -118,7 +118,7 @@ async fn test_create_session_with_rebuy(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_with_notes(#[future] test_db: TestDb) {
+async fn test_create_session_with_notes(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -143,7 +143,7 @@ async fn test_create_session_with_notes(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_invalid_date_format(#[future] test_db: TestDb) {
+async fn test_create_session_invalid_date_format(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -167,7 +167,7 @@ async fn test_create_session_invalid_date_format(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_generates_uuid(#[future] test_db: TestDb) {
+async fn test_create_session_generates_uuid(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -181,7 +181,7 @@ async fn test_create_session_generates_uuid(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_persists_to_database(#[future] test_db: TestDb) {
+async fn test_create_session_persists_to_database(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -199,7 +199,7 @@ async fn test_create_session_persists_to_database(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_get_sessions_empty(#[future] test_db: TestDb) {
+async fn test_get_sessions_empty(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -210,7 +210,7 @@ async fn test_get_sessions_empty(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_get_sessions_multiple(#[future] test_db: TestDb) {
+async fn test_get_sessions_multiple(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -240,7 +240,7 @@ async fn test_get_sessions_multiple(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_get_sessions_user_isolation(#[future] test_db: TestDb) {
+async fn test_get_sessions_user_isolation(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     // Create two users
@@ -286,7 +286,7 @@ async fn test_get_sessions_user_isolation(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_assigns_correct_user(#[future] test_db: TestDb) {
+async fn test_create_session_assigns_correct_user(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let user_a = create_test_user_raw(&db, "usera@test.com", "usera");
@@ -304,7 +304,7 @@ async fn test_create_session_assigns_correct_user(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_profit_calculation_positive(#[future] test_db: TestDb) {
+async fn test_profit_calculation_positive(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -333,7 +333,7 @@ async fn test_profit_calculation_positive(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_profit_calculation_negative(#[future] test_db: TestDb) {
+async fn test_profit_calculation_negative(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -362,7 +362,7 @@ async fn test_profit_calculation_negative(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_profit_calculation_break_even(#[future] test_db: TestDb) {
+async fn test_profit_calculation_break_even(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -391,7 +391,7 @@ async fn test_profit_calculation_break_even(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_profit_calculation_with_rebuy(#[future] test_db: TestDb) {
+async fn test_profit_calculation_with_rebuy(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -420,7 +420,7 @@ async fn test_profit_calculation_with_rebuy(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_profit_calculation_decimal_precision(#[future] test_db: TestDb) {
+async fn test_profit_calculation_decimal_precision(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -449,7 +449,7 @@ async fn test_profit_calculation_decimal_precision(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_amounts_stored_correctly(#[future] test_db: TestDb) {
+async fn test_amounts_stored_correctly(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -478,7 +478,7 @@ async fn test_amounts_stored_correctly(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_get_session_success(#[future] test_db: TestDb) {
+async fn test_get_session_success(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -497,7 +497,7 @@ async fn test_get_session_success(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_get_session_not_found(#[future] test_db: TestDb) {
+async fn test_get_session_not_found(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -510,7 +510,7 @@ async fn test_get_session_not_found(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_get_session_wrong_user(#[future] test_db: TestDb) {
+async fn test_get_session_wrong_user(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let user_a = create_test_user_raw(&db, "usera@test.com", "usera");
@@ -529,7 +529,7 @@ async fn test_get_session_wrong_user(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_update_session_all_fields(#[future] test_db: TestDb) {
+async fn test_update_session_all_fields(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -559,7 +559,7 @@ async fn test_update_session_all_fields(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_update_session_partial(#[future] test_db: TestDb) {
+async fn test_update_session_partial(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -598,7 +598,7 @@ async fn test_update_session_partial(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_update_session_not_found(#[future] test_db: TestDb) {
+async fn test_update_session_not_found(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -619,7 +619,7 @@ async fn test_update_session_not_found(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_update_session_wrong_user(#[future] test_db: TestDb) {
+async fn test_update_session_wrong_user(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let user_a = create_test_user_raw(&db, "usera@test.com", "usera");
@@ -652,7 +652,7 @@ async fn test_update_session_wrong_user(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_update_session_invalid_date(#[future] test_db: TestDb) {
+async fn test_update_session_invalid_date(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -677,7 +677,7 @@ async fn test_update_session_invalid_date(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_delete_session_success(#[future] test_db: TestDb) {
+async fn test_delete_session_success(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -696,7 +696,7 @@ async fn test_delete_session_success(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_delete_session_not_found(#[future] test_db: TestDb) {
+async fn test_delete_session_not_found(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -708,7 +708,7 @@ async fn test_delete_session_not_found(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_delete_session_wrong_user(#[future] test_db: TestDb) {
+async fn test_delete_session_wrong_user(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
 
     let user_a = create_test_user_raw(&db, "usera@test.com", "usera");
@@ -731,7 +731,7 @@ async fn test_delete_session_wrong_user(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_delete_session_idempotent(#[future] test_db: TestDb) {
+async fn test_delete_session_idempotent(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -758,7 +758,7 @@ async fn test_delete_session_idempotent(#[future] test_db: TestDb) {
 #[case("")] // Empty string
 #[tokio::test]
 async fn test_create_session_invalid_date_various_formats(
-    #[future] test_db: TestDb,
+    #[future] test_db: DirectConnectionTestDb,
     #[case] invalid_date: String,
 ) {
     let db = test_db.await;
@@ -783,7 +783,7 @@ async fn test_create_session_invalid_date_various_formats(
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_valid_date_formats(#[future] test_db: TestDb) {
+async fn test_create_session_valid_date_formats(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -803,7 +803,7 @@ async fn test_create_session_valid_date_formats(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_create_session_boundary_dates(#[future] test_db: TestDb) {
+async fn test_create_session_boundary_dates(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
@@ -833,7 +833,7 @@ async fn test_create_session_boundary_dates(#[future] test_db: TestDb) {
 
 #[rstest]
 #[tokio::test]
-async fn test_update_preserves_unmodified_fields(#[future] test_db: TestDb) {
+async fn test_update_preserves_unmodified_fields(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
     let user = create_test_user_raw(&db, "test@test.com", "testuser");
 
