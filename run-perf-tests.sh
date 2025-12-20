@@ -18,7 +18,7 @@ docker compose -f docker-compose.yml -f docker-compose.perf.yml up -d --build
 
 # Wait for services to be ready
 echo -e "${YELLOW}Waiting for backend to be healthy...${NC}"
-timeout 60 bash -c 'until docker exec poker_tracker_perf_backend wget -qO /dev/null http://localhost:8080/api/health 2>/dev/null; do sleep 2; done' || {
+timeout 60 bash -c 'until wget -qO /dev/null http://localhost:8080/api/health 2>/dev/null; do sleep 2; done' || {
     echo -e "${RED}Backend failed to start. Checking logs:${NC}"
     docker compose -f docker-compose.yml -f docker-compose.perf.yml logs backend
     exit 1
