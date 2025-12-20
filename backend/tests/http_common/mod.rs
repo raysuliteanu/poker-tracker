@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use axum_test::TestServer;
 use poker_tracker::app::{AppState, create_app_router};
 use poker_tracker::models::user::AuthResponse;
@@ -10,8 +12,7 @@ use crate::common::TestDb;
 /// Test context combining axum-test server with testcontainers database
 pub struct HttpTestContext {
     pub server: TestServer,
-    #[expect(dead_code)]
-    db: TestDb, // Keep TestDb alive for the container
+    _db_provider: Arc<TestDb>, // Keep TestDb alive for the container
 }
 
 impl HttpTestContext {
@@ -21,13 +22,17 @@ impl HttpTestContext {
             std::env::set_var("JWT_SECRET", "test_secret_key_for_http_testing");
         }
 
-        let db = TestDb::new().await;
-        let db_pool = db.create_pool();
-        let app_state = Arc::new(AppState { db_pool });
+        let db_provider = Arc::new(TestDb::new().await);
+        let app_state = Arc::new(AppState {
+            db_provider: db_provider.clone(),
+        });
         let router = create_app_router(app_state);
         let server = TestServer::new(router).expect("Failed to create test server");
 
-        Self { server, db }
+        Self {
+            server,
+            _db_provider: db_provider,
+        }
     }
 }
 

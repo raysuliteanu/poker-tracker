@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bcrypt::{DEFAULT_COST, hash};
 use diesel::PgConnection;
 use diesel::prelude::*;
@@ -16,6 +18,8 @@ pub struct TestDb {
     // The container handle must be held for the database to stay alive
     #[expect(dead_code)]
     container: ContainerAsync<Postgres>,
+    // Internal pool for AppDbProvider implementation
+    pool: poker_tracker::utils::DbPool,
 }
 
 impl TestDb {
@@ -32,9 +36,17 @@ impl TestDb {
 
         TestDb::run_migrations(&database_url).expect("Failed to run migrations on test DB");
 
+        // Create connection pool for AppDbProvider
+        use diesel::r2d2::{ConnectionManager, Pool};
+        let manager = ConnectionManager::<PgConnection>::new(&database_url);
+        let pool = Pool::builder()
+            .build(manager)
+            .expect("Failed to create test database pool");
+
         Self {
             database_url,
             container,
+            pool,
         }
     }
 
@@ -50,15 +62,6 @@ impl TestDb {
 
         Ok(())
     }
-
-    /// Create a connection pool from this test database
-    pub fn create_pool(&self) -> poker_tracker::utils::DbPool {
-        use diesel::r2d2::{ConnectionManager, Pool};
-        let manager = ConnectionManager::<PgConnection>::new(&self.database_url);
-        Pool::builder()
-            .build(manager)
-            .expect("Failed to create test database pool")
-    }
 }
 
 impl poker_tracker::utils::DbConnectionProvider for TestDb {
@@ -67,6 +70,16 @@ impl poker_tracker::utils::DbConnectionProvider for TestDb {
 
     fn get_connection(&self) -> Result<Self::Connection, Self::Error> {
         PgConnection::establish(&self.database_url)
+    }
+}
+
+impl poker_tracker::utils::PooledConnectionProvider for TestDb {
+    fn get_connection(
+        &self,
+    ) -> Result<poker_tracker::utils::DbConnection, Box<dyn std::error::Error + Send + Sync>> {
+        self.pool
+            .get()
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
 }
 

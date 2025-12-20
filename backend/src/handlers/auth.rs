@@ -127,7 +127,7 @@ pub async fn register(
             .into_response();
     }
 
-    let user = match do_register(&state.db_pool, req.email, req.username, req.password) {
+    let user = match do_register(&state.db_provider, req.email, req.username, req.password) {
         Ok(u) => u,
         Err(RegisterError::PasswordHash) => {
             return (
@@ -204,7 +204,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequ
             .into_response();
     }
 
-    let user = match do_login(&state.db_pool, req.email, req.password) {
+    let user = match do_login(&state.db_provider, req.email, req.password) {
         Ok(u) => u,
         Err(LoginError::DatabaseConnection) => {
             return (
@@ -246,7 +246,7 @@ pub async fn get_me(
     State(state): State<Arc<AppState>>,
     Extension(user_id): Extension<Uuid>,
 ) -> Response {
-    let mut conn = match state.db_pool.get() {
+    let mut conn = match state.db_provider.get_connection() {
         Ok(conn) => conn,
         Err(_) => {
             return (
@@ -276,7 +276,7 @@ pub async fn update_cookie_consent(
     Extension(user_id): Extension<Uuid>,
     Json(consent): Json<UpdateCookieConsent>,
 ) -> Response {
-    let mut conn = match state.db_pool.get() {
+    let mut conn = match state.db_provider.get_connection() {
         Ok(conn) => conn,
         Err(_) => {
             return (
@@ -330,7 +330,7 @@ pub async fn change_password(
             .into_response();
     }
 
-    let mut conn = match state.db_pool.get() {
+    let mut conn = match state.db_provider.get_connection() {
         Ok(conn) => conn,
         Err(_) => {
             return (

@@ -225,7 +225,7 @@ pub async fn create_session(
             .into_response();
     }
 
-    match do_create_session(&state.db_pool, user_id, session_req).await {
+    match do_create_session(&state.db_provider, user_id, session_req).await {
         Ok(session) => {
             let profit = calculate_profit(
                 &session.buy_in_amount,
@@ -255,7 +255,7 @@ pub async fn get_sessions(
     State(state): State<Arc<AppState>>,
     Extension(user_id): Extension<Uuid>,
 ) -> Response {
-    let mut conn = match state.db_pool.get() {
+    let mut conn = match state.db_provider.get_connection() {
         Ok(conn) => conn,
         Err(_) => {
             return (
@@ -299,7 +299,7 @@ pub async fn get_session(
     Extension(user_id): Extension<Uuid>,
     Path(session_id): Path<Uuid>,
 ) -> Response {
-    match do_get_session(&state.db_pool, session_id, user_id) {
+    match do_get_session(&state.db_provider, session_id, user_id) {
         Ok(session) => {
             let profit = calculate_profit(
                 &session.buy_in_amount,
@@ -331,7 +331,7 @@ pub async fn update_session(
     Path(session_id): Path<Uuid>,
     Json(update_req): Json<UpdatePokerSessionRequest>,
 ) -> Response {
-    match do_update_session(&state.db_pool, session_id, user_id, update_req) {
+    match do_update_session(&state.db_provider, session_id, user_id, update_req) {
         Ok(session) => {
             let profit = calculate_profit(
                 &session.buy_in_amount,
@@ -376,7 +376,7 @@ pub async fn delete_session(
     Extension(user_id): Extension<Uuid>,
     Path(session_id): Path<Uuid>,
 ) -> Response {
-    match do_delete_session(&state.db_pool, session_id, user_id) {
+    match do_delete_session(&state.db_provider, session_id, user_id) {
         Ok(()) => (
             StatusCode::OK,
             Json(serde_json::json!({
@@ -411,7 +411,7 @@ pub async fn export_sessions(
     Extension(user_id): Extension<Uuid>,
     Query(query): Query<ExportQuery>,
 ) -> Response {
-    let mut conn = match state.db_pool.get() {
+    let mut conn = match state.db_provider.get_connection() {
         Ok(conn) => conn,
         Err(_) => {
             return (

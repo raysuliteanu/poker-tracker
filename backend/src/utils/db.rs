@@ -1,6 +1,7 @@
 use diesel::pg::PgConnection;
 use diesel::r2d2::{self, ConnectionManager, Pool, PooledConnection};
 use std::env;
+use std::sync::Arc;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
@@ -22,6 +23,26 @@ impl DbConnectionProvider for DbPool {
 
     fn get_connection(&self) -> Result<Self::Connection, Self::Error> {
         self.get()
+    }
+}
+
+pub trait PooledConnectionProvider: Send + Sync {
+    fn get_connection(&self) -> Result<DbConnection, Box<dyn std::error::Error + Send + Sync>>;
+}
+
+impl PooledConnectionProvider for DbPool {
+    fn get_connection(&self) -> Result<DbConnection, Box<dyn std::error::Error + Send + Sync>> {
+        self.get()
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+    }
+}
+
+impl DbConnectionProvider for Arc<dyn PooledConnectionProvider> {
+    type Connection = DbConnection;
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn get_connection(&self) -> Result<Self::Connection, Self::Error> {
+        (**self).get_connection()
     }
 }
 

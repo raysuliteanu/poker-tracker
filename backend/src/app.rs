@@ -25,7 +25,7 @@ use crate::{handlers, middleware, utils};
 // I guess clippy can't deduce that
 #[allow(dead_code)]
 async fn health(State(state): State<Arc<AppState>>) -> Response {
-    if let Ok(mut conn) = state.db_pool.get()
+    if let Ok(mut conn) = state.db_provider.get_connection()
         && let Ok(_) = diesel::select(diesel::dsl::sql::<Integer>("1")).execute(&mut conn)
     {
         (
@@ -50,7 +50,7 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 // Shared application state
 pub struct AppState {
-    pub db_pool: utils::DbPool,
+    pub db_provider: Arc<dyn utils::PooledConnectionProvider>,
 }
 
 /// Create the application router with the given state.
@@ -113,7 +113,9 @@ impl PokerTrackerApp {
         tracing::info!("Starting server at http://{}", bind_address);
 
         // Create shared application state
-        let state = Arc::new(AppState { db_pool: pool });
+        let state = Arc::new(AppState {
+            db_provider: Arc::new(pool),
+        });
 
         // Build the router using the extracted function
         let app = create_app_router(state);
