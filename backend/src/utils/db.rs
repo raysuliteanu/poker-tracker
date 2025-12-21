@@ -24,7 +24,12 @@ pub fn establish_connection_pool() -> DbPool {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<PgConnection>::new(database_url);
 
+    let max_pool_connections = env::var("MAX_POOL_CONNECTIONS")
+        .map(|s| s.parse::<u32>().unwrap_or(100))
+        .unwrap_or(100);
+
     r2d2::Pool::builder()
+        .max_size(max_pool_connections)
         .build(manager)
         .expect("Failed to create database connection pool")
 }

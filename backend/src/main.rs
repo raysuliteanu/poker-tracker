@@ -11,7 +11,7 @@ use dotenvy::dotenv;
 
 use crate::app::PokerTrackerApp;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 100)]
 async fn main() -> Result<()> {
     dotenv().ok();
 
