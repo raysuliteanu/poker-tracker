@@ -20,10 +20,10 @@ Tracker application.
 - **Framework:** Axum 0.8
 - **ORM:** Diesel 2.x with PostgreSQL
 - **Authentication:** JWT (jsonwebtoken crate)
-- **Password Hashing:** bcrypt
+- **Password Hashing:** bcrypt (configurable cost via BCRYPT_COST)
 - **Validation:** validator crate
 - **Error Handling:** thiserror
-- **Testing:** testcontainers, rstest
+- **Testing:** testcontainers, rstest, axum-test, proptest
 
 ### Directory Structure
 
@@ -46,13 +46,18 @@ backend/
 │   │   ├── mod.rs
 │   │   └── auth.rs          # JWT authentication middleware (Axum layer)
 │   └── utils/
-│       ├── mod.rs
-│       ├── db.rs            # Database pool and DbConnectionProvider trait
+│       ├── mod.rs           # Module exports and get_bcrypt_cost() helper
+│       ├── db.rs            # Database pool and DbProvider trait
 │       └── jwt.rs           # JWT creation/validation
 ├── tests/
 │   ├── common/
-│   │   └── mod.rs           # TestDb fixture using testcontainers
-│   └── session_tests.rs     # Integration tests
+│   │   └── mod.rs           # DirectConnectionTestDb and PooledConnectionTestDb fixtures
+│   ├── http_common/
+│   │   └── mod.rs           # HTTP test fixtures using axum-test
+│   ├── auth_tests.rs        # Auth integration tests (19 tests)
+│   ├── session_tests.rs     # Session integration tests (40 tests)
+│   ├── http_auth_tests.rs   # HTTP auth integration tests (24 tests)
+│   └── http_session_tests.rs # HTTP session integration tests (25 tests)
 ├── migrations/              # Diesel migrations
 ├── Cargo.toml
 └── Dockerfile
@@ -98,11 +103,16 @@ pub async fn handler(Extension(user_id): Extension<Uuid>) -> Response {
 
 **Connection Pooling:** r2d2 with Diesel PostgreSQL backend
 
-**DbConnectionProvider Trait:** Abstraction that allows handlers to work with both:
-- Production: Connection pools (`DbPool`)
-- Testing: Direct connections from testcontainers (`TestDb`)
+**Configuration:**
+- `MAX_POOL_CONNECTIONS` (default: 100) - Maximum pool size
+- `min_idle(10)` - Keeps 10 connections warm for reduced latency
 
-This enables true integration testing of business logic without mocking.
+**DbProvider Trait:** Single trait abstraction for database connections:
+- Production: `DbPool` implements `DbProvider` with pooled connections
+- Unit tests: `DirectConnectionTestDb` implements `DbProvider` with ephemeral single-connection pools
+- HTTP tests: `PooledConnectionTestDb` implements `DbProvider` with proper connection pools (production fidelity)
+
+This enables true integration testing of business logic without mocking while maintaining clear separation between test types.
 
 **Migrations:** Run automatically on startup via `embed_migrations!` macro
 
@@ -138,37 +148,88 @@ CREATE TABLE poker_sessions (
 
 ### Integration Testing
 
-**Framework:** testcontainers + rstest
+**Framework:** testcontainers + rstest + axum-test + proptest
 
 **Location:** `backend/tests/` directory
 
+**Test Types:**
+
+1. **Unit Tests** (`auth_tests.rs`, `session_tests.rs`): Test business logic directly
+   - 59 tests covering auth and session operations
+   - Use `DirectConnectionTestDb` for fast, isolated testing
+   - Call `do_*` functions directly without HTTP layer
+
+2. **HTTP Tests** (`http_auth_tests.rs`, `http_session_tests.rs`): Test full HTTP stack
+   - 49 tests covering HTTP endpoints and middleware
+   - Use `PooledConnectionTestDb` for production fidelity
+   - Use `axum-test` for HTTP request/response testing
+
+3. **Property-based Tests** (in `middleware/auth.rs`): Validate invariants
+   - Use `proptest` for auth header parsing edge cases
+   - Ensures robust error handling
+
 **Key Components:**
 
-1. **TestDb struct** (`tests/common/mod.rs`):
+1. **DirectConnectionTestDb** (`tests/common/mod.rs`):
    - Manages a temporary PostgreSQL container using testcontainers
-   - Runs migrations automatically on container startup
-   - Implements `DbConnectionProvider` trait for handler compatibility
-   - Container lifecycle tied to TestDb instance (automatic cleanup)
+   - Creates ephemeral single-connection pools (cost 4 for tests)
+   - Implements `DbProvider` trait for handler compatibility
+   - Used by unit tests for maximum clarity and isolation
 
-2. **rstest fixtures** (`tests/common/mod.rs`):
-   - `#[fixture]` async fn test_db() provides fresh database for each test
+2. **PooledConnectionTestDb** (`tests/common/mod.rs`):
+   - Also manages a temporary PostgreSQL container
+   - Maintains a proper connection pool like production
+   - Implements `DbProvider` trait
+   - Used by HTTP tests to match production behavior
+
+3. **HttpTestContext** (`tests/http_common/mod.rs`):
+   - Wraps `axum-test::TestServer` with `PooledConnectionTestDb`
+   - Provides helper functions for common HTTP operations
+   - Manages JWT tokens for authenticated requests
+
+4. **rstest fixtures**:
+   - `#[fixture]` async fn test_db() provides `DirectConnectionTestDb`
+   - `#[fixture]` async fn http_ctx() provides `HttpTestContext`
    - Use with `#[rstest]` attribute on test functions
 
-3. **Handler testing pattern**:
-   - Extract business logic into `do_*` functions accepting `DbConnectionProvider`
-   - Call `do_*` functions directly in tests with `TestDb` instance
-   - Enables testing without HTTP layer, focusing on business logic
+5. **Handler testing pattern**:
+   - Extract business logic into `do_*` functions accepting `&dyn DbProvider`
+   - Call `do_*` functions directly in unit tests
+   - Call HTTP handlers through `TestServer` in HTTP tests
+   - All handlers use non-generic trait objects for simplicity
 
-**Example:**
+**Example (Unit Test):**
 
 ```rust
 #[rstest]
 #[tokio::test]
-async fn test_create_session(#[future] test_db: TestDb) {
+async fn test_create_session(#[future] test_db: DirectConnectionTestDb) {
     let db = test_db.await;
-    // Create test data directly via Diesel
-    // Call handler's do_* function with TestDb
-    // Assert results
+    let user = create_test_user_raw(&db, "test@test.com", "test");
+
+    let result = do_create_session(
+        &db,
+        user.id,
+        default_session_request(),
+    ).await;
+
+    assert!(result.is_ok());
+}
+```
+
+**Example (HTTP Test):**
+
+```rust
+#[rstest]
+#[tokio::test]
+async fn test_register_with_valid_data(#[future] http_ctx: HttpTestContext) {
+    let ctx = http_ctx.await;
+    let response = ctx.server
+        .post("/api/auth/register")
+        .json(&json!({"email": "test@test.com", "username": "test", "password": "pass123"}))
+        .await;
+
+    response.assert_status_created();
 }
 ```
 
@@ -177,6 +238,8 @@ async fn test_create_session(#[future] test_db: TestDb) {
 - Isolated test environment per test
 - Tests actual SQL queries and migrations
 - Fast setup/teardown with containers
+- Comprehensive coverage: 108 integration tests
+- Production fidelity with HTTP tests using pooled connections
 
 ## Frontend Architecture
 
@@ -402,9 +465,45 @@ services:
 
 - `postgres_data`: Persists database data
 
+## Performance Configuration
+
+The backend includes several configurable parameters for optimization:
+
+### Database Connection Pool
+
+- `MAX_POOL_CONNECTIONS` (default: 100) - Maximum number of pooled connections
+- `min_idle(10)` - Keeps 10 connections warm to reduce latency
+- Connection timeout: 5 seconds
+
+### Bcrypt Hashing Cost
+
+- `BCRYPT_COST` (default: 12) - Password hashing cost factor
+- Production: 12 (secure, ~250ms per hash)
+- Load testing: 4 (fast, ~15ms per hash, configured in docker-compose.perf.yml)
+- Trade-off: Lower cost = faster authentication but less security
+
+### Tokio Runtime
+
+- Uses default worker threads (number of CPU cores)
+- Multi-threaded runtime for concurrent request handling
+
+### API Pagination
+
+- GET /sessions limited to 100 most recent sessions
+- Prevents unbounded result sets as data grows
+- Ensures consistent performance regardless of session count
+
+### Performance Testing
+
+The k6 load tests can be customized:
+- `./run-perf-tests.sh` - Default 100 virtual users
+- `./run-perf-tests.sh 500` - Custom VU count
+- Each VU uses unique user to eliminate database contention
+- Tests use BCRYPT_COST=4 automatically for realistic load simulation
+
 ## Security Considerations
 
-- Passwords hashed with bcrypt
+- Passwords hashed with bcrypt (configurable cost via BCRYPT_COST)
 - JWT tokens expire after 7 days
 - CORS configured (currently allows any origin - restrict for production)
 - Auth middleware validates all protected routes

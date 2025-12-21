@@ -70,12 +70,12 @@ to fork and make a PR.
 
 - **Language**: Rust
 - **Framework**: Axum
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (with configurable connection pooling)
 - **ORM**: Diesel
-- **Authentication**: JWT (jsonwebtoken), bcrypt
+- **Authentication**: JWT (jsonwebtoken), bcrypt (configurable cost)
 - **Error Handling**: thiserror
 - **Migrations**: diesel_migrations
-- **Testing**: testcontainers, rstest
+- **Testing**: testcontainers, rstest, axum-test, proptest
 
 ### Frontend
 
@@ -190,6 +190,10 @@ JWT_SECRET=your-secret-key-change-this-in-production
 RUST_LOG=info
 HOST=127.0.0.1
 PORT=8080
+
+# Optional performance tuning
+BCRYPT_COST=12                # Password hashing cost (4-6 for tests, 12+ for production)
+MAX_POOL_CONNECTIONS=100      # Database connection pool size
 ```
 
 ### Frontend (.env)
@@ -226,12 +230,13 @@ VITE_API_URL=http://localhost:8080/api
 
 ## Security Features
 
-- Password hashing with bcrypt
-- JWT token authentication
+- Password hashing with bcrypt (configurable cost via BCRYPT_COST, default: 12)
+- JWT token authentication (7-day expiration)
 - CORS configuration
 - SQL injection prevention via Diesel ORM
-- Input validation
+- Input validation with validator crate
 - Secure session management
+- Database connection pooling with configurable limits
 
 ## Production Deployment
 
@@ -293,23 +298,32 @@ npm test
 
 ### Backend Tests
 
-The backend includes both unit tests and integration tests:
+The backend includes comprehensive testing at multiple levels:
 
-- **Unit tests**: Located within individual source files
-- **Integration tests**: Located in `backend/tests/` directory
+- **Unit tests**: Located within individual source files (93 tests)
+- **Integration tests**: Located in `backend/tests/` directory (108 tests)
+  - `auth_tests.rs` - 19 auth business logic tests
+  - `session_tests.rs` - 40 session business logic tests
+  - `http_auth_tests.rs` - 24 HTTP endpoint tests
+  - `http_session_tests.rs` - 25 HTTP endpoint tests
+- **Property-based tests**: Using proptest for auth middleware edge cases
 
 Integration tests use:
 - **testcontainers**: Automatically spins up PostgreSQL containers for isolated testing
-- **rstest**: Provides fixtures for test setup (e.g., `test_db` fixture)
+- **rstest**: Provides fixtures for test setup (`test_db`, `http_ctx` fixtures)
+- **axum-test**: Provides HTTP testing framework for end-to-end endpoint tests
+- **proptest**: Validates invariants with generated test cases
 
-The `DbConnectionProvider` trait allows handlers to work with both pooled connections
-(production) and direct connections (tests), enabling true integration testing of
-business logic.
+The `DbProvider` trait allows handlers to work with both pooled connections
+(production and HTTP tests) and direct connections (unit tests), enabling true
+integration testing of business logic with production fidelity.
 
 ```bash
 cd backend
-cargo test                        # Run all tests
-cargo test --test session_tests   # Run specific integration test
+cargo test                        # Run all tests (201 total)
+cargo test --lib                  # Run only unit tests (93 tests)
+cargo test --test auth_tests      # Run auth integration tests
+cargo test --test http_auth_tests # Run HTTP auth tests
 ```
 
 ### Frontend Tests
@@ -331,7 +345,8 @@ Test files are located in `frontend/src/tests/` and follow the pattern `*.test.t
 ### Performance Tests
 
 The project includes k6 load tests for the backend API. Performance tests use a
-separate database to avoid interfering with development data.
+separate database and optimized bcrypt configuration to avoid interfering with
+development data.
 
 **Prerequisites:**
 
@@ -342,19 +357,29 @@ separate database to avoid interfering with development data.
 
 ```bash
 # Quick way: Use the helper script
-./run-perf-tests.sh
+./run-perf-tests.sh          # Default 100 virtual users
+./run-perf-tests.sh 500      # Run with 500 virtual users
 
 # Manual way: Run docker-compose commands directly
 docker compose -f docker-compose.yml -f docker-compose.perf.yml up -d --build
 # Wait for services to be healthy
 docker compose -f docker-compose.yml -f docker-compose.perf.yml ps
 # Run k6 performance tests
-k6 run performance-test.js
+k6 run -e K6_VUS=100 performance-test.js
 # Tear down when finished
 docker compose -f docker-compose.yml -f docker-compose.perf.yml down
 ```
 
-The helper script (`run-perf-tests.sh`) automates the entire workflow: starting the performance environment, waiting for services to be healthy, running k6 tests, and tearing down afterward.
+The helper script (`run-perf-tests.sh`) automates the entire workflow: starting
+the performance environment, waiting for services to be healthy, running k6 tests,
+and tearing down afterward.
+
+**Configuration:**
+
+- Each virtual user (VU) gets a unique test account to eliminate database contention
+- Backend uses `BCRYPT_COST=4` for faster authentication (configured in docker-compose.perf.yml)
+- Connection pool sized for concurrent load
+- Pagination limits ensure consistent performance
 
 The performance test (`performance-test.js`) simulates user workflows including:
 
@@ -366,6 +391,8 @@ Default thresholds:
 
 - HTTP error rate < 1%
 - 95th percentile response time < 500ms
+- Login p95 latency < 500ms (achievable with BCRYPT_COST=4)
+- Session operations p95 latency < 500ms
 
 ### E2E Tests
 
