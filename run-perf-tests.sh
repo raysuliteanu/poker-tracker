@@ -24,8 +24,9 @@ timeout 60 bash -c 'until wget -qO /dev/null http://localhost:8080/api/health 2>
     exit 1
 }
 
-echo -e "${GREEN}Backend is ready. Running k6 performance tests...${NC}"
-k6 run performance-test.js
+VUS=${1:-100}
+echo -e "${GREEN}Backend is ready. Running k6 performance tests with ${VUS} VUs...${NC}"
+k6 run -e K6_VUS=${VUS} performance-test.js
 
 TEST_EXIT_CODE=$?
 

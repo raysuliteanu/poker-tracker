@@ -22,6 +22,7 @@ services:
         environment:
             DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker_perf_test
             RUST_LOG: warn # Reduce logging noise during performance tests
+            BCRYPT_COST: 4 # Lower cost for faster performance testing
 
     frontend:
         # We don't need the frontend for backend performance testing

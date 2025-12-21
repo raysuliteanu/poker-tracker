@@ -11,10 +11,13 @@ const createSessionLatency = new Trend('create_session_latency');
 const getSessionsLatency = new Trend('get_sessions_latency');
 
 // --- Test Configuration ---
+// VUs can be overridden via K6_VUS environment variable (default: 100)
+const TARGET_VUS = __ENV.K6_VUS ? parseInt(__ENV.K6_VUS) : 100;
+
 export const options = {
   stages: [
-    { duration: '20s', target: 10 }, // Ramp-up to 10 virtual users over 20 seconds
-    { duration: '30s', target: 10 }, // Stay at 10 virtual users for 30 seconds
+    { duration: '30s', target: TARGET_VUS }, // Ramp-up to target VUs
+    { duration: '60s', target: TARGET_VUS }, // Stay at target VUs
     { duration: '10s', target: 0 },  // Ramp-down to 0 users
   ],
   thresholds: {
@@ -54,38 +57,52 @@ function getTodayDate() {
 // --- Test Lifecycle ---
 
 // setup() is called once before the test starts.
-// We create a single user here to be used by all VUs.
+// We create 100 unique users, one for each VU to eliminate contention.
 export function setup() {
-  const username = `testuser_${randomString(8)}`;
-  const email = `${username}@test.com`;
-  const password = 'password123';
-
-  const registerPayload = JSON.stringify({
-    username,
-    email,
-    password,
-  });
-
+  const users = [];
   const params = {
     headers: {
       'Content-Type': 'application/json',
     },
   };
 
-  const res = http.post(`${BASE_URL}/auth/register`, registerPayload, params);
+  console.log(`Creating ${TARGET_VUS} unique users for load test...`);
 
-  check(res, { 'setup: user registered successfully': (r) => r.status === 201 });
+  for (let i = 0; i < TARGET_VUS; i++) {
+    const username = `testuser_${randomString(8)}`;
+    const email = `${username}@test.com`;
+    const password = 'password123';
 
-  return { email, password };
+    const registerPayload = JSON.stringify({
+      username,
+      email,
+      password,
+    });
+
+    const res = http.post(`${BASE_URL}/auth/register`, registerPayload, params);
+
+    if (!check(res, { 'setup: user registered successfully': (r) => r.status === 201 })) {
+      console.error(`Failed to register user ${i}: ${res.status} ${res.body}`);
+    }
+
+    users.push({ email, password });
+  }
+
+  console.log(`Successfully created ${users.length} users`);
+  return { users };
 }
 
 
 // The main function that virtual users will execute repeatedly.
 export default function (data) {
+  // Each VU uses its own unique user (VU IDs are 1-indexed)
+  const userIndex = (__VU - 1) % data.users.length;
+  const user = data.users[userIndex];
+
   // 1. Login to get JWT token
   const loginPayload = JSON.stringify({
-    email: data.email,
-    password: data.password,
+    email: user.email,
+    password: user.password,
   });
 
   const authParams = {

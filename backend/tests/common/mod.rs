@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
-use bcrypt::{DEFAULT_COST, hash};
+use bcrypt::hash;
 use diesel::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use poker_tracker::models::user::{NewUser, User};
 use poker_tracker::models::{CreatePokerSessionRequest, PokerSession};
 use poker_tracker::schema::{poker_sessions, users};
-use poker_tracker::utils::{DbConnection, DbPool, DbProvider};
+use poker_tracker::utils::{DbConnection, DbPool, DbProvider, get_bcrypt_cost};
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
@@ -137,7 +137,7 @@ pub fn create_test_user_with_password(
     password: &str,
 ) -> User {
     let mut conn = db.get_connection().expect("Failed to get db connection");
-    let password_hash = hash(password, DEFAULT_COST).expect("Failed to hash password");
+    let password_hash = hash(password, get_bcrypt_cost()).expect("Failed to hash password");
     let new_user = NewUser {
         email: email.to_string(),
         username: username.to_string(),

@@ -255,6 +255,7 @@ pub async fn get_sessions(
     match poker_sessions::table
         .filter(poker_sessions::user_id.eq(user_id))
         .order(poker_sessions::session_date.desc())
+        .limit(100)
         .load::<PokerSession>(&mut conn)
     {
         Ok(sessions) => {

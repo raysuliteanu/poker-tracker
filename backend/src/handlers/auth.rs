@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
-use bcrypt::{DEFAULT_COST, hash, verify};
+use bcrypt::{hash, verify};
 use chrono::Utc;
 use diesel::prelude::*;
 use std::sync::Arc;
@@ -18,7 +18,7 @@ use crate::models::{
     UpdateCookieConsent, User,
 };
 use crate::schema::users;
-use crate::utils::{DbProvider, create_jwt};
+use crate::utils::{DbProvider, create_jwt, get_bcrypt_cost};
 
 #[derive(Debug, Error)]
 pub enum RegisterError {
@@ -51,7 +51,8 @@ pub fn do_register(
     username: String,
     password: String,
 ) -> Result<User, RegisterError> {
-    let password_hash = hash(&password, DEFAULT_COST).map_err(|_| RegisterError::PasswordHash)?;
+    let password_hash =
+        hash(&password, get_bcrypt_cost()).map_err(|_| RegisterError::PasswordHash)?;
 
     let new_user = NewUser {
         email,
@@ -365,7 +366,7 @@ pub async fn change_password(
             .into_response();
     }
 
-    let new_password_hash = match hash(&passwords.new_password, DEFAULT_COST) {
+    let new_password_hash = match hash(&passwords.new_password, get_bcrypt_cost()) {
         Ok(h) => h,
         Err(_) => {
             return (

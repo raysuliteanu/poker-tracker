@@ -30,6 +30,7 @@ pub fn establish_connection_pool() -> DbPool {
 
     r2d2::Pool::builder()
         .max_size(max_pool_connections)
+        .min_idle(Some(10))
         .build(manager)
         .expect("Failed to create database connection pool")
 }
