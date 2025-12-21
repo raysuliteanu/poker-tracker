@@ -389,7 +389,9 @@ async fn test_multiple_users_independent_login(#[future] test_db: DirectConnecti
 
 #[rstest]
 #[tokio::test]
-async fn test_register_same_email_different_username_fails(#[future] test_db: DirectConnectionTestDb) {
+async fn test_register_same_email_different_username_fails(
+    #[future] test_db: DirectConnectionTestDb,
+) {
     let db = test_db.await;
 
     do_register(
@@ -412,7 +414,9 @@ async fn test_register_same_email_different_username_fails(#[future] test_db: Di
 
 #[rstest]
 #[tokio::test]
-async fn test_register_same_username_different_email_fails(#[future] test_db: DirectConnectionTestDb) {
+async fn test_register_same_username_different_email_fails(
+    #[future] test_db: DirectConnectionTestDb,
+) {
     let db = test_db.await;
 
     do_register(

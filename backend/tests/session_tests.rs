@@ -2,7 +2,8 @@ mod common;
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use common::{
-    DirectConnectionTestDb, create_test_user_raw, default_session_request, get_session_by_id, get_sessions_for_user,
+    DirectConnectionTestDb, create_test_user_raw, default_session_request, get_session_by_id,
+    get_sessions_for_user,
 };
 use diesel::{prelude::*, sql_types::Integer};
 use poker_tracker::handlers::poker_session::{

@@ -2,7 +2,7 @@ mod common;
 mod http_common;
 
 use axum::http::StatusCode;
-use http_common::{default_session_json, http_ctx, register_and_get_token, HttpTestContext};
+use http_common::{HttpTestContext, default_session_json, http_ctx, register_and_get_token};
 use poker_tracker::models::poker_session::SessionWithProfit;
 use poker_tracker::models::user::AuthResponse;
 use rstest::rstest;
@@ -82,7 +82,10 @@ async fn test_create_session_with_notes(#[future] http_ctx: HttpTestContext) {
 
     response.assert_status(StatusCode::CREATED);
     let session: SessionWithProfit = response.json();
-    assert_eq!(session.session.notes, Some("Bad session, tilted on river".to_string()));
+    assert_eq!(
+        session.session.notes,
+        Some("Bad session, tilted on river".to_string())
+    );
     assert_eq!(session.profit, -20.0);
 }
 
@@ -346,7 +349,10 @@ async fn test_update_session_partial(#[future] http_ctx: HttpTestContext) {
     assert_eq!(updated.session.duration_minutes, 120);
     assert_eq!(updated.profit, 50.0);
     // Only notes changed
-    assert_eq!(updated.session.notes, Some("Updated notes only".to_string()));
+    assert_eq!(
+        updated.session.notes,
+        Some("Updated notes only".to_string())
+    );
 }
 
 #[rstest]
@@ -808,7 +814,10 @@ async fn test_session_crud_lifecycle(#[future] http_ctx: HttpTestContext) {
     update_resp.assert_status_ok();
     let updated_session: SessionWithProfit = update_resp.json();
     assert_eq!(updated_session.profit, 500.0);
-    assert_eq!(updated_session.session.notes, Some("Updated: big win!".to_string()));
+    assert_eq!(
+        updated_session.session.notes,
+        Some("Updated: big win!".to_string())
+    );
 
     // Delete
     ctx.server
