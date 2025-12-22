@@ -7,7 +7,7 @@ use rstest::fixture;
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::common::PooledConnectionTestDb;
+use crate::common::{PooledConnectionTestDb, test_config};
 
 /// Test context combining axum-test server with testcontainers database
 pub struct HttpTestContext {
@@ -17,14 +17,11 @@ pub struct HttpTestContext {
 
 impl HttpTestContext {
     pub async fn new() -> Self {
-        // Set JWT_SECRET for tests
-        unsafe {
-            std::env::set_var("JWT_SECRET", "test_secret_key_for_http_testing");
-        }
-
         let db_provider = Arc::new(PooledConnectionTestDb::new().await);
+        let config = test_config();
         let app_state = Arc::new(AppState {
             db_provider: db_provider.clone() as Arc<dyn poker_tracker::utils::DbProvider>,
+            config,
         });
         let router = create_app_router(app_state);
         let server = TestServer::new(router).expect("Failed to create test server");

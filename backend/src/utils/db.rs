@@ -1,6 +1,7 @@
 use diesel::pg::PgConnection;
 use diesel::r2d2::{self, ConnectionManager, Pool, PooledConnection};
-use std::env;
+
+use crate::utils::DatabaseConfig;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;
@@ -20,17 +21,12 @@ impl DbProvider for DbPool {
     }
 }
 
-pub fn establish_connection_pool() -> DbPool {
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-
-    let max_pool_connections = env::var("MAX_POOL_CONNECTIONS")
-        .map(|s| s.parse::<u32>().unwrap_or(100))
-        .unwrap_or(100);
+pub fn establish_connection_pool(db_config: &DatabaseConfig) -> DbPool {
+    let manager = ConnectionManager::<PgConnection>::new(&db_config.url);
 
     r2d2::Pool::builder()
-        .max_size(max_pool_connections)
-        .min_idle(Some(10))
+        .max_size(db_config.max_connections)
+        .min_idle(Some(db_config.min_idle))
         .build(manager)
         .expect("Failed to create database connection pool")
 }

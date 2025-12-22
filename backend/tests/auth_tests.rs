@@ -1,6 +1,6 @@
 mod common;
 
-use common::DirectConnectionTestDb;
+use common::{DirectConnectionTestDb, test_config};
 use poker_tracker::handlers::auth::{LoginError, RegisterError, do_login, do_register};
 use rstest::rstest;
 
@@ -13,6 +13,7 @@ async fn test_register_user_success(#[future] test_db: DirectConnectionTestDb) {
 
     let user = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "testuser".to_string(),
         "password123".to_string(),
@@ -34,6 +35,7 @@ async fn test_register_duplicate_email(#[future] test_db: DirectConnectionTestDb
     // First registration should succeed
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "duplicate@example.com".to_string(),
         "user1".to_string(),
         "password123".to_string(),
@@ -43,6 +45,7 @@ async fn test_register_duplicate_email(#[future] test_db: DirectConnectionTestDb
     // Second registration with same email should fail
     let result = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "duplicate@example.com".to_string(),
         "user2".to_string(),
         "password456".to_string(),
@@ -59,6 +62,7 @@ async fn test_register_duplicate_username(#[future] test_db: DirectConnectionTes
     // First registration should succeed
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "user1@example.com".to_string(),
         "duplicateuser".to_string(),
         "password123".to_string(),
@@ -68,6 +72,7 @@ async fn test_register_duplicate_username(#[future] test_db: DirectConnectionTes
     // Second registration with same username should fail
     let result = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "user2@example.com".to_string(),
         "duplicateuser".to_string(),
         "password456".to_string(),
@@ -83,6 +88,7 @@ async fn test_register_returns_valid_user_id(#[future] test_db: DirectConnection
 
     let user = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "testuser".to_string(),
         "password123".to_string(),
@@ -100,6 +106,7 @@ async fn test_register_sets_default_cookie_consent(#[future] test_db: DirectConn
 
     let user = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "testuser".to_string(),
         "password123".to_string(),
@@ -119,6 +126,7 @@ async fn test_login_success(#[future] test_db: DirectConnectionTestDb) {
     // First register a user
     let registered_user = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "login@example.com".to_string(),
         "loginuser".to_string(),
         "correctpassword".to_string(),
@@ -146,6 +154,7 @@ async fn test_login_wrong_password(#[future] test_db: DirectConnectionTestDb) {
     // First register a user
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "login@example.com".to_string(),
         "loginuser".to_string(),
         "correctpassword".to_string(),
@@ -187,7 +196,7 @@ async fn test_login_after_registration_flow(#[future] test_db: DirectConnectionT
     let password = "securepassword123".to_string();
 
     // Register
-    let registered = do_register(&db, email.clone(), "flowuser".to_string(), password.clone())
+    let registered = do_register(&db, test_config().security.bcrypt_cost, email.clone(), "flowuser".to_string(), password.clone())
         .expect("Registration should succeed");
 
     // Login
@@ -205,6 +214,7 @@ async fn test_login_case_sensitive_email(#[future] test_db: DirectConnectionTest
     // Register with lowercase email
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "testuser".to_string(),
         "password123".to_string(),
@@ -232,6 +242,7 @@ async fn test_login_password_not_stored_plaintext(#[future] test_db: DirectConne
     // Register
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "testuser".to_string(),
         password.to_string(),
@@ -263,6 +274,7 @@ async fn test_register_empty_email(#[future] test_db: DirectConnectionTestDb) {
     // This tests that we can create users with various inputs
     let result = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "".to_string(),
         "testuser".to_string(),
         "password123".to_string(),
@@ -282,6 +294,7 @@ async fn test_register_empty_username(#[future] test_db: DirectConnectionTestDb)
 
     let result = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "".to_string(),
         "password123".to_string(),
@@ -299,6 +312,7 @@ async fn test_register_empty_password(#[future] test_db: DirectConnectionTestDb)
     // Empty password should still hash successfully with bcrypt
     let result = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "testuser".to_string(),
         "".to_string(),
@@ -327,6 +341,7 @@ async fn test_login_empty_password(#[future] test_db: DirectConnectionTestDb) {
     // First register a user with a real password
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "test@example.com".to_string(),
         "testuser".to_string(),
         "realpassword123".to_string(),
@@ -347,6 +362,7 @@ async fn test_multiple_users_independent_login(#[future] test_db: DirectConnecti
     // Register multiple users
     let user1 = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "user1@example.com".to_string(),
         "user1".to_string(),
         "password1".to_string(),
@@ -355,6 +371,7 @@ async fn test_multiple_users_independent_login(#[future] test_db: DirectConnecti
 
     let user2 = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "user2@example.com".to_string(),
         "user2".to_string(),
         "password2".to_string(),
@@ -396,6 +413,7 @@ async fn test_register_same_email_different_username_fails(
 
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "shared@example.com".to_string(),
         "user1".to_string(),
         "password1".to_string(),
@@ -404,6 +422,7 @@ async fn test_register_same_email_different_username_fails(
 
     let result = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "shared@example.com".to_string(),
         "user2".to_string(),
         "password2".to_string(),
@@ -421,6 +440,7 @@ async fn test_register_same_username_different_email_fails(
 
     do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "user1@example.com".to_string(),
         "shareduser".to_string(),
         "password1".to_string(),
@@ -429,6 +449,7 @@ async fn test_register_same_username_different_email_fails(
 
     let result = do_register(
         &db,
+        test_config().security.bcrypt_cost,
         "user2@example.com".to_string(),
         "shareduser".to_string(),
         "password2".to_string(),

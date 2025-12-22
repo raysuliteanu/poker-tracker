@@ -7,7 +7,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use poker_tracker::models::user::{NewUser, User};
 use poker_tracker::models::{CreatePokerSessionRequest, PokerSession};
 use poker_tracker::schema::{poker_sessions, users};
-use poker_tracker::utils::{DbConnection, DbPool, DbProvider, get_bcrypt_cost};
+use poker_tracker::utils::{AppConfig, DatabaseConfig, DbConnection, DbPool, DbProvider, SecurityConfig, ServerConfig};
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
@@ -114,6 +114,25 @@ impl DbProvider for PooledConnectionTestDb {
     }
 }
 
+/// Helper to create a test config for unit and integration tests
+pub fn test_config() -> AppConfig {
+    AppConfig {
+        server: ServerConfig {
+            host: "127.0.0.1".to_string(),
+            port: 8080,
+        },
+        database: DatabaseConfig {
+            url: "test_url".to_string(), // Will be overridden per test
+            max_connections: 10,
+            min_idle: 1,
+        },
+        security: SecurityConfig {
+            jwt_secret: "test_secret".to_string(),
+            bcrypt_cost: 4, // Fast for tests
+        },
+    }
+}
+
 /// Helper to create a test user directly in the database (without password hashing)
 pub fn create_test_user_raw(db: &dyn DbProvider, email: &str, username: &str) -> User {
     let mut conn = db.get_connection().expect("Failed to get db connection");
@@ -132,12 +151,13 @@ pub fn create_test_user_raw(db: &dyn DbProvider, email: &str, username: &str) ->
 /// Helper to create a test user with a properly hashed password
 pub fn create_test_user_with_password(
     db: &dyn DbProvider,
+    bcrypt_cost: u32,
     email: &str,
     username: &str,
     password: &str,
 ) -> User {
     let mut conn = db.get_connection().expect("Failed to get db connection");
-    let password_hash = hash(password, get_bcrypt_cost()).expect("Failed to hash password");
+    let password_hash = hash(password, bcrypt_cost).expect("Failed to hash password");
     let new_user = NewUser {
         email: email.to_string(),
         username: username.to_string(),

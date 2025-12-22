@@ -20,10 +20,79 @@ Tracker application.
 - **Framework:** Axum 0.8
 - **ORM:** Diesel 2.x with PostgreSQL
 - **Authentication:** JWT (jsonwebtoken crate)
-- **Password Hashing:** bcrypt (configurable cost via BCRYPT_COST)
+- **Password Hashing:** bcrypt (configurable cost)
+- **Configuration:** config crate with TOML support
 - **Validation:** validator crate
 - **Error Handling:** thiserror
 - **Testing:** testcontainers, rstest, axum-test, proptest
+
+### Configuration System
+
+The application uses a centralized TOML-based configuration system via the `config` crate with environment variable overrides and hardcoded defaults.
+
+**Configuration Precedence:** defaults → TOML file → environment variables
+
+**Configuration Structure:**
+
+```rust
+AppConfig {
+    server: ServerConfig {
+        host: String,      // Default: "127.0.0.1"
+        port: u16,         // Default: 8080
+    },
+    database: DatabaseConfig {
+        url: String,           // Required, no default
+        max_connections: u32,  // Default: 100
+        min_idle: u32,         // Default: 10
+    },
+    security: SecurityConfig {
+        jwt_secret: String,    // Required, no default
+        bcrypt_cost: u32,      // Default: 12
+    },
+}
+```
+
+**Configuration Sources:**
+
+1. **TOML File** (`poker-tracker.toml`, optional):
+   ```toml
+   [server]
+   host = "127.0.0.1"
+   port = 8080
+
+   [database]
+   url = "postgres://..."
+   max_connections = 100
+   min_idle = 10
+
+   [security]
+   jwt_secret = "secret"
+   bcrypt_cost = 12
+   ```
+
+2. **Environment Variables** (override TOML):
+   - `DATABASE_URL` → `database.url`
+   - `SECURITY_JWT_SECRET` → `security.jwt_secret`
+   - `DATABASE_MAX_CONNECTIONS` → `database.max_connections`
+   - `DATABASE_MIN_IDLE` → `database.min_idle`
+   - `SECURITY_BCRYPT_COST` → `security.bcrypt_cost`
+   - `SERVER_HOST` → `server.host`
+   - `SERVER_PORT` → `server.port`
+
+3. **Hardcoded Defaults** (used if not in TOML or env)
+
+**Required Fields:**
+- `DATABASE_URL`: PostgreSQL connection string
+- `SECURITY_JWT_SECRET`: JWT signing secret
+
+If required fields are missing, the application exits with a clear error message.
+
+**Loading Process:**
+1. `main.rs` calls `AppConfig::load()` on startup
+2. Config is passed to `PokerTrackerApp::new(config)`
+3. Config is stored in `AppState` for handler access
+4. JWT secret is passed to `AuthLayer` middleware
+5. Handlers access config via `state.config`
 
 ### Directory Structure
 
@@ -46,7 +115,8 @@ backend/
 │   │   ├── mod.rs
 │   │   └── auth.rs          # JWT authentication middleware (Axum layer)
 │   └── utils/
-│       ├── mod.rs           # Module exports and get_bcrypt_cost() helper
+│       ├── mod.rs           # Module exports
+│       ├── config.rs        # Configuration system (AppConfig)
 │       ├── db.rs            # Database pool and DbProvider trait
 │       └── jwt.rs           # JWT creation/validation
 ├── tests/
@@ -104,8 +174,9 @@ pub async fn handler(Extension(user_id): Extension<Uuid>) -> Response {
 **Connection Pooling:** r2d2 with Diesel PostgreSQL backend
 
 **Configuration:**
-- `MAX_POOL_CONNECTIONS` (default: 100) - Maximum pool size
-- `min_idle(10)` - Keeps 10 connections warm for reduced latency
+- `max_connections` (default: 100) - Maximum pool size
+- `min_idle` (default: 10) - Keeps connections warm for reduced latency
+- Both configurable via `DatabaseConfig` in `AppConfig`
 
 **DbProvider Trait:** Single trait abstraction for database connections:
 - Production: `DbPool` implements `DbProvider` with pooled connections
@@ -467,20 +538,22 @@ services:
 
 ## Performance Configuration
 
-The backend includes several configurable parameters for optimization:
+The backend includes several configurable parameters for optimization, all configurable via `poker-tracker.toml` or environment variables:
 
 ### Database Connection Pool
 
-- `MAX_POOL_CONNECTIONS` (default: 100) - Maximum number of pooled connections
-- `min_idle(10)` - Keeps 10 connections warm to reduce latency
+- `database.max_connections` (default: 100) - Maximum number of pooled connections
+- `database.min_idle` (default: 10) - Keeps connections warm to reduce latency
 - Connection timeout: 5 seconds
+- Configure via `DATABASE_MAX_CONNECTIONS` and `DATABASE_MIN_IDLE` env vars or TOML
 
 ### Bcrypt Hashing Cost
 
-- `BCRYPT_COST` (default: 12) - Password hashing cost factor
+- `security.bcrypt_cost` (default: 12) - Password hashing cost factor
 - Production: 12 (secure, ~250ms per hash)
 - Load testing: 4 (fast, ~15ms per hash, configured in docker-compose.perf.yml)
 - Trade-off: Lower cost = faster authentication but less security
+- Configure via `SECURITY_BCRYPT_COST` env var or TOML
 
 ### Tokio Runtime
 
@@ -503,17 +576,19 @@ The k6 load tests can be customized:
 
 ## Security Considerations
 
-- Passwords hashed with bcrypt (configurable cost via BCRYPT_COST)
-- JWT tokens expire after 7 days
+- Passwords hashed with bcrypt (configurable cost via `security.bcrypt_cost`)
+- JWT tokens expire after 7 days (secret configured via `security.jwt_secret`)
 - CORS configured (currently allows any origin - restrict for production)
 - Auth middleware validates all protected routes
 - SQL injection prevented by Diesel's parameterized queries
 - XSS mitigated by Svelte's automatic escaping
+- Configuration system supports environment-only secrets (don't commit JWT_SECRET to TOML in production)
 
 ## Production Deployment Notes
 
 1. Update CORS configuration in `main.rs` to restrict origins
-2. Set strong `JWT_SECRET` environment variable
-3. Use proper PostgreSQL credentials
-4. Consider adding rate limiting
+2. Set strong `SECURITY_JWT_SECRET` environment variable (never commit to version control)
+3. Use proper PostgreSQL credentials via `DATABASE_URL` environment variable
+4. Consider using TOML for non-secret config, environment variables for secrets
+5. Consider adding rate limiting
 5. Enable HTTPS via reverse proxy or load balancer

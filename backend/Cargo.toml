@@ -33,6 +33,7 @@ futures = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2.0.17"
+config = { version = "0.15.19", features = ["toml", "convert-case", "async"] }
 
 [dev-dependencies]
 axum-test = "18"

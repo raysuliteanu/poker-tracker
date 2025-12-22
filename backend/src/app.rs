@@ -6,7 +6,6 @@ use axum::{
     routing::{get, post, put},
 };
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
@@ -20,6 +19,7 @@ use diesel::RunQueryDsl;
 use diesel::sql_types::Integer;
 
 use crate::{handlers, middleware, utils};
+use crate::utils::AppConfig;
 
 // this method is called from the /api/health route, via Axum
 async fn health(State(state): State<Arc<AppState>>) -> Response {
@@ -49,6 +49,7 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 // Shared application state
 pub struct AppState {
     pub db_provider: Arc<dyn utils::DbProvider>,
+    pub config: AppConfig,
 }
 
 /// Create the application router with the given state.
@@ -59,6 +60,8 @@ pub fn create_app_router(state: Arc<AppState>) -> Router {
         .allow_methods(Any)
         .allow_headers(Any)
         .max_age(std::time::Duration::from_secs(3600));
+
+    let jwt_secret = state.config.security.jwt_secret.clone();
 
     Router::new()
         .route("/api/health", get(health))
@@ -82,36 +85,37 @@ pub fn create_app_router(state: Arc<AppState>) -> Router {
                 .delete(poker_session::delete_session),
         )
         // Apply middleware
-        .layer(AuthLayer::new())
+        .layer(AuthLayer::new(jwt_secret))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
-pub struct PokerTrackerApp;
+pub struct PokerTrackerApp {
+    config: AppConfig,
+}
 
 impl PokerTrackerApp {
-    pub fn new() -> Self {
-        PokerTrackerApp
+    pub fn new(config: AppConfig) -> Self {
+        PokerTrackerApp { config }
     }
 
     pub async fn run(self) -> std::io::Result<()> {
-        let pool = establish_connection_pool();
+        let pool = establish_connection_pool(&self.config.database);
 
         // Run migrations
         let mut conn = pool.get().expect("Failed to get connection");
         conn.run_pending_migrations(MIGRATIONS)
             .expect("Failed to run migrations");
 
-        let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-        let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-        let bind_address = format!("{}:{}", host, port);
+        let bind_address = format!("{}:{}", self.config.server.host, self.config.server.port);
 
         tracing::info!("Starting server at http://{}", bind_address);
 
         // Create shared application state
         let state = Arc::new(AppState {
             db_provider: Arc::new(pool),
+            config: self.config.clone(),
         });
 
         // Build the router using the extracted function
@@ -129,11 +133,5 @@ impl PokerTrackerApp {
         axum::serve(listener, app)
             .await
             .map_err(std::io::Error::other)
-    }
-}
-
-impl Default for PokerTrackerApp {
-    fn default() -> Self {
-        Self::new()
     }
 }

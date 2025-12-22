@@ -18,7 +18,7 @@ use crate::models::{
     UpdateCookieConsent, User,
 };
 use crate::schema::users;
-use crate::utils::{DbProvider, create_jwt, get_bcrypt_cost};
+use crate::utils::{DbProvider, create_jwt};
 
 #[derive(Debug, Error)]
 pub enum RegisterError {
@@ -47,12 +47,13 @@ pub enum LoginError {
 /// Business logic for user registration
 pub fn do_register(
     db_provider: &dyn DbProvider,
+    bcrypt_cost: u32,
     email: String,
     username: String,
     password: String,
 ) -> Result<User, RegisterError> {
     let password_hash =
-        hash(&password, get_bcrypt_cost()).map_err(|_| RegisterError::PasswordHash)?;
+        hash(&password, bcrypt_cost).map_err(|_| RegisterError::PasswordHash)?;
 
     let new_user = NewUser {
         email,
@@ -124,6 +125,7 @@ pub async fn register(
 
     let user = match do_register(
         state.db_provider.as_ref(),
+        state.config.security.bcrypt_cost,
         req.email,
         req.username,
         req.password,
@@ -176,7 +178,7 @@ pub async fn register(
         }
     };
 
-    let token = match create_jwt(user.id) {
+    let token = match create_jwt(user.id, &state.config.security.jwt_secret) {
         Ok(t) => t,
         Err(_) => {
             return (
@@ -226,7 +228,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequ
         }
     };
 
-    let token = match create_jwt(user.id) {
+    let token = match create_jwt(user.id, &state.config.security.jwt_secret) {
         Ok(t) => t,
         Err(_) => {
             return (
@@ -366,7 +368,7 @@ pub async fn change_password(
             .into_response();
     }
 
-    let new_password_hash = match hash(&passwords.new_password, get_bcrypt_cost()) {
+    let new_password_hash = match hash(&passwords.new_password, state.config.security.bcrypt_cost) {
         Ok(h) => h,
         Err(_) => {
             return (
