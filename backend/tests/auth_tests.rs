@@ -196,8 +196,14 @@ async fn test_login_after_registration_flow(#[future] test_db: DirectConnectionT
     let password = "securepassword123".to_string();
 
     // Register
-    let registered = do_register(&db, test_config().security.bcrypt_cost, email.clone(), "flowuser".to_string(), password.clone())
-        .expect("Registration should succeed");
+    let registered = do_register(
+        &db,
+        test_config().security.bcrypt_cost,
+        email.clone(),
+        "flowuser".to_string(),
+        password.clone(),
+    )
+    .expect("Registration should succeed");
 
     // Login
     let logged_in = do_login(&db, email, password).expect("Login should succeed");

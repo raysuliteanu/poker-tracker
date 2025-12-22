@@ -26,7 +26,10 @@ pub enum TokenError {
 
 /// Extract and validate a Bearer token from an Authorization header value.
 /// Returns the user UUID if valid, or an error describing what went wrong.
-pub fn extract_user_id_from_auth_header(auth_header: Option<&str>, jwt_secret: &str) -> Result<Uuid, TokenError> {
+pub fn extract_user_id_from_auth_header(
+    auth_header: Option<&str>,
+    jwt_secret: &str,
+) -> Result<Uuid, TokenError> {
     let header = auth_header.ok_or(TokenError::Missing)?;
 
     let token = header

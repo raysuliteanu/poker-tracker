@@ -7,7 +7,9 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use poker_tracker::models::user::{NewUser, User};
 use poker_tracker::models::{CreatePokerSessionRequest, PokerSession};
 use poker_tracker::schema::{poker_sessions, users};
-use poker_tracker::utils::{AppConfig, DatabaseConfig, DbConnection, DbPool, DbProvider, SecurityConfig, ServerConfig};
+use poker_tracker::utils::{
+    AppConfig, DatabaseConfig, DbConnection, DbPool, DbProvider, SecurityConfig, ServerConfig,
+};
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;

@@ -18,8 +18,8 @@ use utils::establish_connection_pool;
 use diesel::RunQueryDsl;
 use diesel::sql_types::Integer;
 
-use crate::{handlers, middleware, utils};
 use crate::utils::AppConfig;
+use crate::{handlers, middleware, utils};
 
 // this method is called from the /api/health route, via Axum
 async fn health(State(state): State<Arc<AppState>>) -> Response {

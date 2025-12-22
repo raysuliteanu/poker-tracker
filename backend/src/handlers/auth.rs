@@ -52,8 +52,7 @@ pub fn do_register(
     username: String,
     password: String,
 ) -> Result<User, RegisterError> {
-    let password_hash =
-        hash(&password, bcrypt_cost).map_err(|_| RegisterError::PasswordHash)?;
+    let password_hash = hash(&password, bcrypt_cost).map_err(|_| RegisterError::PasswordHash)?;
 
     let new_user = NewUser {
         email,
