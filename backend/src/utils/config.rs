@@ -115,10 +115,7 @@ mod tests {
             config.bcrypt_cost, 4,
             "bcrypt_cost should match BCRYPT_COST env var"
         );
-        assert_eq!(
-            config.host, "0.0.0.0",
-            "host should match HOST env var"
-        );
+        assert_eq!(config.host, "0.0.0.0", "host should match HOST env var");
         assert_eq!(config.port, 9090, "port should match PORT env var");
     }
 
