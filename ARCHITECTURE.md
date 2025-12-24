@@ -38,7 +38,7 @@ The application uses a centralized TOML-based configuration system via the `conf
 PokerTrackerConfig {
     host: String,              // Default: "127.0.0.1"
     port: u16,                 // Default: 8080
-    db_url: String,            // Required, no default
+    database_url: String,            // Required, no default
     db_max_connections: u32,   // Default: 100
     db_min_idle: u32,          // Default: 10
     jwt_secret: String,        // Required, no default
@@ -52,7 +52,7 @@ PokerTrackerConfig {
    ```toml
    host = "127.0.0.1"
    port = 8080
-   db_url = "postgres://..."
+   database_url = "postgres://..."
    db_max_connections = 100
    db_min_idle = 10
    jwt_secret = "secret"
@@ -60,7 +60,7 @@ PokerTrackerConfig {
    ```
 
 2. **Environment Variables** (override TOML):
-   - `DB_URL` → `db_url`
+   - `DATABASE_URL` → `database_url`
    - `JWT_SECRET` → `jwt_secret`
    - `DB_MAX_CONNECTIONS` → `db_max_connections`
    - `DB_MIN_IDLE` → `db_min_idle`
@@ -71,7 +71,7 @@ PokerTrackerConfig {
 3. **Hardcoded Defaults** (used if not in TOML or env)
 
 **Required Fields:**
-- `DB_URL`: PostgreSQL connection string
+- `DATABASE_URL`: PostgreSQL connection string
 - `JWT_SECRET`: JWT signing secret
 
 If required fields are missing, the application exits with a clear error message.
@@ -577,7 +577,7 @@ The k6 load tests can be customized:
 
 1. Update CORS configuration in `main.rs` to restrict origins
 2. Set strong `JWT_SECRET` environment variable (never commit to version control)
-3. Use proper PostgreSQL credentials via `DB_URL` environment variable
+3. Use proper PostgreSQL credentials via `DATABASE_URL` environment variable
 4. Consider using TOML for non-secret config, environment variables for secrets
 5. Consider adding rate limiting
 5. Enable HTTPS via reverse proxy or load balancer

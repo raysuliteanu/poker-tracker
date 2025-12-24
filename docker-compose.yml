@@ -22,7 +22,7 @@ services:
             dockerfile: Dockerfile
         container_name: poker_tracker_backend
         environment:
-            DB_URL: postgres://postgres:password@postgres:5432/poker_tracker
+            DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker
             JWT_SECRET: change-this-secret-in-production
             RUST_LOG: debug
             HOST: 0.0.0.0

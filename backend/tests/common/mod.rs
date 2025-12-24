@@ -119,7 +119,7 @@ pub fn test_config() -> PokerTrackerConfig {
     PokerTrackerConfig {
         host: "127.0.0.1".to_string(),
         port: 8080,
-        db_url: "test_url".to_string(), // Will be overridden per test
+        database_url: "test_url".to_string(), // Will be overridden per test
         db_max_connections: 10,
         db_min_idle: 1,
         jwt_secret: "test_secret".to_string(),

@@ -7,7 +7,7 @@ port = 8080
 
 # Database configuration
 # Required: database connection URL
-db_url = "postgres://postgres:password@localhost/poker_tracker"
+database_url = "postgres://postgres:password@localhost/poker_tracker"
 # Optional: Connection pool configuration
 db_max_connections = 100
 db_min_idle = 10

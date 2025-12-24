@@ -109,11 +109,11 @@ cd backend
 
 # Option 1: Use TOML configuration (recommended)
 cp poker-tracker.toml.example poker-tracker.toml
-# Edit poker-tracker.toml and update db_url and jwt_secret
+# Edit poker-tracker.toml and update database_url and jwt_secret
 
 # Option 2: Use environment variables
 cp .env.example .env
-# Edit .env and update DB_URL and JWT_SECRET
+# Edit .env and update DATABASE_URL and JWT_SECRET
 
 # Install diesel CLI (if not already installed)
 cargo install diesel_cli --no-default-features --features postgres
@@ -197,7 +197,7 @@ Create `backend/poker-tracker.toml` (see `poker-tracker.toml.example`):
 ```toml
 host = "127.0.0.1"
 port = 8080
-db_url = "postgres://postgres:password@localhost/poker_tracker"
+database_url = "postgres://postgres:password@localhost/poker_tracker"
 db_max_connections = 100
 db_min_idle = 10
 jwt_secret = "your-secret-key-change-this-in-production"
@@ -210,7 +210,7 @@ Environment variables override TOML values:
 
 ```sh
 # Required (no defaults)
-DB_URL=postgres://postgres:password@localhost/poker_tracker
+DATABASE_URL=postgres://postgres:password@localhost/poker_tracker
 JWT_SECRET=your-secret-key-change-this-in-production
 
 # Optional (have defaults)
@@ -224,7 +224,7 @@ BCRYPT_COST=12
 RUST_LOG=info
 ```
 
-**Production Recommendation:** Use TOML for non-sensitive configuration, environment variables for secrets (DB_URL, JWT_SECRET).
+**Production Recommendation:** Use TOML for non-sensitive configuration, environment variables for secrets (DATABASE_URL, JWT_SECRET).
 
 ### Frontend (.env)
 
@@ -274,8 +274,8 @@ VITE_API_URL=http://localhost:8080/api
 ### Considerations
 
 1. **Configuration**: Use TOML for non-secret config, environment variables for secrets
-   - Never commit `JWT_SECRET` or `DB_URL` with real credentials to version control
-   - Use environment variables for `DB_URL` and `JWT_SECRET` in production
+   - Never commit `JWT_SECRET` or `DATABASE_URL` with real credentials to version control
+   - Use environment variables for `DATABASE_URL` and `JWT_SECRET` in production
    - Consider using `poker-tracker.toml` for server host/port and performance tuning
 2. **HTTPS**: Use a reverse proxy (nginx/traefik) with SSL certificates
 3. **Database**: Use managed PostgreSQL or secure your database server

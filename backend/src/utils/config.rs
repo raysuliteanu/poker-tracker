@@ -7,7 +7,7 @@ pub struct PokerTrackerConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
-    pub db_url: String, // Required, no default
+    pub database_url: String, // Required, no default
     #[serde(default = "default_db_max_connections")]
     pub db_max_connections: u32,
     #[serde(default = "default_db_min_idle")]
@@ -68,15 +68,15 @@ mod tests {
         // Set environment variables in UPPER_CASE
         // Clean up any existing variables for test isolation
         unsafe {
-            std::env::remove_var("DB_URL");
-            std::env::remove_var("db_url");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("database_url");
             std::env::remove_var("JWT_SECRET");
             std::env::remove_var("jwt_secret");
             std::env::remove_var("BCRYPT_COST");
         }
 
         unsafe {
-            std::env::set_var("DB_URL", "postgres://test:test@localhost/test");
+            std::env::set_var("DATABASE_URL", "postgres://test:test@localhost/test");
             std::env::set_var("JWT_SECRET", "test-secret-key");
             std::env::set_var("BCRYPT_COST", "4");
             std::env::set_var("HOST", "0.0.0.0");
@@ -106,8 +106,8 @@ mod tests {
 
         // Verify values were parsed correctly
         assert_eq!(
-            config.db_url, "postgres://test:test@localhost/test",
-            "db_url should match DB_URL env var"
+            config.database_url, "postgres://test:test@localhost/test",
+            "database_url should match DATABASE_URL env var"
         );
         assert_eq!(
             config.jwt_secret, "test-secret-key",
@@ -129,15 +129,15 @@ mod tests {
 
         // Clean up for test isolation
         unsafe {
-            std::env::remove_var("DB_URL");
-            std::env::remove_var("db_url");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("database_url");
             std::env::remove_var("JWT_SECRET");
             std::env::remove_var("jwt_secret");
             std::env::remove_var("BCRYPT_COST");
         }
 
         unsafe {
-            std::env::set_var("db_url", "postgres://test2:test2@localhost/test2");
+            std::env::set_var("database_url", "postgres://test2:test2@localhost/test2");
             std::env::set_var("jwt_secret", "test-secret-key-2");
         }
 
@@ -159,7 +159,7 @@ mod tests {
             .try_deserialize::<PokerTrackerConfig>();
 
         unsafe {
-            std::env::remove_var("db_url");
+            std::env::remove_var("database_url");
             std::env::remove_var("jwt_secret");
         }
 
@@ -170,7 +170,10 @@ mod tests {
         );
 
         let config = config_result.unwrap();
-        assert_eq!(config.db_url, "postgres://test2:test2@localhost/test2");
+        assert_eq!(
+            config.database_url,
+            "postgres://test2:test2@localhost/test2"
+        );
         assert_eq!(config.jwt_secret, "test-secret-key-2");
     }
 
@@ -179,8 +182,8 @@ mod tests {
     fn test_missing_required_fields() {
         // Ensure required fields cause an error when missing
         unsafe {
-            std::env::remove_var("DB_URL");
-            std::env::remove_var("db_url");
+            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("database_url");
             std::env::remove_var("JWT_SECRET");
             std::env::remove_var("jwt_secret");
             std::env::remove_var("BCRYPT_COST");

@@ -22,7 +22,7 @@ impl DbProvider for DbPool {
 }
 
 pub fn establish_connection_pool(config: &PokerTrackerConfig) -> DbPool {
-    let manager = ConnectionManager::<PgConnection>::new(&config.db_url);
+    let manager = ConnectionManager::<PgConnection>::new(&config.database_url);
 
     r2d2::Pool::builder()
         .max_size(config.db_max_connections)
