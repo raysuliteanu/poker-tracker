@@ -60,8 +60,10 @@ impl PokerTrackerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_env_var_parsing_with_upper_case() {
         // Set environment variables in UPPER_CASE
         // Clean up any existing variables for test isolation
@@ -120,6 +122,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_env_var_parsing_without_case_conversion() {
         // This test checks what happens if we use lowercase env vars
         // to understand the baseline behavior
@@ -172,6 +175,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_missing_required_fields() {
         // Ensure required fields cause an error when missing
         unsafe {
