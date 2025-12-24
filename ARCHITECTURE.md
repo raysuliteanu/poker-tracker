@@ -42,12 +42,12 @@ AppConfig {
     },
     database: DatabaseConfig {
         url: String,           // Required, no default
-        max_connections: u32,  // Default: 100
-        min_idle: u32,         // Default: 10
+        maxconnections: u32,   // Default: 100
+        minidle: u32,          // Default: 10
     },
     security: SecurityConfig {
-        jwt_secret: String,    // Required, no default
-        bcrypt_cost: u32,      // Default: 12
+        jwtsecret: String,     // Required, no default
+        bcryptcost: u32,       // Default: 12
     },
 }
 ```
@@ -62,20 +62,20 @@ AppConfig {
 
    [database]
    url = "postgres://..."
-   max_connections = 100
-   min_idle = 10
+   maxconnections = 100
+   minidle = 10
 
    [security]
-   jwt_secret = "secret"
-   bcrypt_cost = 12
+   jwtsecret = "secret"
+   bcryptcost = 12
    ```
 
 2. **Environment Variables** (override TOML):
    - `DATABASE_URL` → `database.url`
-   - `SECURITY_JWT_SECRET` → `security.jwt_secret`
-   - `DATABASE_MAX_CONNECTIONS` → `database.max_connections`
-   - `DATABASE_MIN_IDLE` → `database.min_idle`
-   - `SECURITY_BCRYPT_COST` → `security.bcrypt_cost`
+   - `SECURITY_JWTSECRET` → `security.jwtsecret`
+   - `DATABASE_MAXCONNECTIONS` → `database.maxconnections`
+   - `DATABASE_MINIDLE` → `database.minidle`
+   - `SECURITY_BCRYPTCOST` → `security.bcryptcost`
    - `SERVER_HOST` → `server.host`
    - `SERVER_PORT` → `server.port`
 
@@ -83,7 +83,7 @@ AppConfig {
 
 **Required Fields:**
 - `DATABASE_URL`: PostgreSQL connection string
-- `SECURITY_JWT_SECRET`: JWT signing secret
+- `SECURITY_JWTSECRET`: JWT signing secret
 
 If required fields are missing, the application exits with a clear error message.
 
@@ -174,8 +174,8 @@ pub async fn handler(Extension(user_id): Extension<Uuid>) -> Response {
 **Connection Pooling:** r2d2 with Diesel PostgreSQL backend
 
 **Configuration:**
-- `max_connections` (default: 100) - Maximum pool size
-- `min_idle` (default: 10) - Keeps connections warm for reduced latency
+- `maxconnections` (default: 100) - Maximum pool size
+- `minidle` (default: 10) - Keeps connections warm for reduced latency
 - Both configurable via `DatabaseConfig` in `AppConfig`
 
 **DbProvider Trait:** Single trait abstraction for database connections:
@@ -542,18 +542,18 @@ The backend includes several configurable parameters for optimization, all confi
 
 ### Database Connection Pool
 
-- `database.max_connections` (default: 100) - Maximum number of pooled connections
-- `database.min_idle` (default: 10) - Keeps connections warm to reduce latency
+- `database.maxconnections` (default: 100) - Maximum number of pooled connections
+- `database.minidle` (default: 10) - Keeps connections warm to reduce latency
 - Connection timeout: 5 seconds
-- Configure via `DATABASE_MAX_CONNECTIONS` and `DATABASE_MIN_IDLE` env vars or TOML
+- Configure via `DATABASE_MAXCONNECTIONS` and `DATABASE_MINIDLE` env vars or TOML
 
 ### Bcrypt Hashing Cost
 
-- `security.bcrypt_cost` (default: 12) - Password hashing cost factor
+- `security.bcryptcost` (default: 12) - Password hashing cost factor
 - Production: 12 (secure, ~250ms per hash)
 - Load testing: 4 (fast, ~15ms per hash, configured in docker-compose.perf.yml)
 - Trade-off: Lower cost = faster authentication but less security
-- Configure via `SECURITY_BCRYPT_COST` env var or TOML
+- Configure via `SECURITY_BCRYPTCOST` env var or TOML
 
 ### Tokio Runtime
 
@@ -572,22 +572,22 @@ The k6 load tests can be customized:
 - `./run-perf-tests.sh` - Default 100 virtual users
 - `./run-perf-tests.sh 500` - Custom VU count
 - Each VU uses unique user to eliminate database contention
-- Tests use BCRYPT_COST=4 automatically for realistic load simulation
+- Tests use BCRYPTCOST=4 automatically for realistic load simulation
 
 ## Security Considerations
 
-- Passwords hashed with bcrypt (configurable cost via `security.bcrypt_cost`)
-- JWT tokens expire after 7 days (secret configured via `security.jwt_secret`)
+- Passwords hashed with bcrypt (configurable cost via `security.bcryptcost`)
+- JWT tokens expire after 7 days (secret configured via `security.jwtsecret`)
 - CORS configured (currently allows any origin - restrict for production)
 - Auth middleware validates all protected routes
 - SQL injection prevented by Diesel's parameterized queries
 - XSS mitigated by Svelte's automatic escaping
-- Configuration system supports environment-only secrets (don't commit JWT_SECRET to TOML in production)
+- Configuration system supports environment-only secrets (don't commit JWTSECRET to TOML in production)
 
 ## Production Deployment Notes
 
 1. Update CORS configuration in `main.rs` to restrict origins
-2. Set strong `SECURITY_JWT_SECRET` environment variable (never commit to version control)
+2. Set strong `SECURITY_JWTSECRET` environment variable (never commit to version control)
 3. Use proper PostgreSQL credentials via `DATABASE_URL` environment variable
 4. Consider using TOML for non-secret config, environment variables for secrets
 5. Consider adding rate limiting

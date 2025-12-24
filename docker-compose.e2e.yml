@@ -19,10 +19,11 @@ services:
         container_name: poker_tracker_e2e_backend
         environment:
             DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker
-            JWT_SECRET: e2e-test-secret
+            SECURITY_JWTSECRET: e2e-test-secret
+            SECURITY_BCRYPTCOST: 4
             RUST_LOG: info
-            HOST: 0.0.0.0
-            PORT: 8080
+            SERVER_HOST: 0.0.0.0
+            SERVER_PORT: 8080
         depends_on:
             postgres:
                 condition: service_healthy
@@ -38,7 +39,15 @@ services:
         depends_on:
             - backend
         healthcheck:
-            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://backend:8080/api/health"]
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "--no-verbose",
+                    "--tries=1",
+                    "--spider",
+                    "http://backend:8080/api/health",
+                ]
             interval: 5s
             timeout: 3s
             retries: 10

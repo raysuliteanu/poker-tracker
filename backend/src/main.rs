@@ -10,7 +10,7 @@ use std::io::Result;
 use dotenvy::dotenv;
 
 use crate::app::PokerTrackerApp;
-use crate::utils::AppConfig;
+use crate::utils::PokerTrackerConfig;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
@@ -25,12 +25,12 @@ async fn main() -> Result<()> {
         .init();
 
     // Load configuration (TOML + env overrides + defaults)
-    let config = match AppConfig::load() {
+    let config = match PokerTrackerConfig::load() {
         Ok(cfg) => cfg,
         Err(e) => {
             eprintln!("Failed to load configuration: {}", e);
             eprintln!(
-                "Required: DATABASE_URL and JWT_SECRET must be set via environment or poker-tracker.toml"
+                "Required: DATABASE_URL and SECURITY_JWTSECRET must be set via environment or in poker-tracker.toml"
             );
             std::process::exit(1);
         }

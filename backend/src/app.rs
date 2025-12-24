@@ -18,7 +18,7 @@ use utils::establish_connection_pool;
 use diesel::RunQueryDsl;
 use diesel::sql_types::Integer;
 
-use crate::utils::AppConfig;
+use crate::utils::PokerTrackerConfig;
 use crate::{handlers, middleware, utils};
 
 // this method is called from the /api/health route, via Axum
@@ -49,7 +49,7 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 // Shared application state
 pub struct AppState {
     pub db_provider: Arc<dyn utils::DbProvider>,
-    pub config: AppConfig,
+    pub config: PokerTrackerConfig,
 }
 
 /// Create the application router with the given state.
@@ -61,7 +61,7 @@ pub fn create_app_router(state: Arc<AppState>) -> Router {
         .allow_headers(Any)
         .max_age(std::time::Duration::from_secs(3600));
 
-    let jwt_secret = state.config.security.jwt_secret.clone();
+    let jwt_secret = state.config.security.jwtsecret.clone();
 
     Router::new()
         .route("/api/health", get(health))
@@ -92,11 +92,11 @@ pub fn create_app_router(state: Arc<AppState>) -> Router {
 }
 
 pub struct PokerTrackerApp {
-    config: AppConfig,
+    config: PokerTrackerConfig,
 }
 
 impl PokerTrackerApp {
-    pub fn new(config: AppConfig) -> Self {
+    pub fn new(config: PokerTrackerConfig) -> Self {
         PokerTrackerApp { config }
     }
 

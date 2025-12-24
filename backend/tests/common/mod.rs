@@ -8,7 +8,8 @@ use poker_tracker::models::user::{NewUser, User};
 use poker_tracker::models::{CreatePokerSessionRequest, PokerSession};
 use poker_tracker::schema::{poker_sessions, users};
 use poker_tracker::utils::{
-    AppConfig, DatabaseConfig, DbConnection, DbPool, DbProvider, SecurityConfig, ServerConfig,
+    DatabaseConfig, DbConnection, DbPool, DbProvider, PokerTrackerConfig, SecurityConfig,
+    ServerConfig,
 };
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
@@ -117,8 +118,8 @@ impl DbProvider for PooledConnectionTestDb {
 }
 
 /// Helper to create a test config for unit and integration tests
-pub fn test_config() -> AppConfig {
-    AppConfig {
+pub fn test_config() -> PokerTrackerConfig {
+    PokerTrackerConfig {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
@@ -129,8 +130,8 @@ pub fn test_config() -> AppConfig {
             min_idle: 1,
         },
         security: SecurityConfig {
-            jwt_secret: "test_secret".to_string(),
-            bcrypt_cost: 4, // Fast for tests
+            jwtsecret: "test_secret".to_string(),
+            bcryptcost: 4, // Fast for tests
         },
     }
 }

@@ -7,7 +7,7 @@ services:
             POSTGRES_PASSWORD: password
             POSTGRES_DB: poker_tracker
         ports:
-            - "5433:5432"  # Keep port mapping for dev environment
+            - "5433:5432" # Keep port mapping for dev environment
         volumes:
             - postgres_data:/var/lib/postgresql/data
         healthcheck:
@@ -23,12 +23,12 @@ services:
         container_name: poker_tracker_backend
         environment:
             DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker
-            JWT_SECRET: change-this-secret-in-production
+            SECURITY_JWTSECRET: change-this-secret-in-production
             RUST_LOG: debug
-            HOST: 0.0.0.0
-            PORT: 8080
+            SERVER_HOST: 0.0.0.0
+            SERVER_PORT: 8080
         ports:
-            - "8080:8080"  # Keep port mapping for dev environment
+            - "8080:8080" # Keep port mapping for dev environment
         depends_on:
             postgres:
                 condition: service_healthy
@@ -48,7 +48,15 @@ services:
         depends_on:
             - backend
         healthcheck:
-            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://backend:8080/api/health"]
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "--no-verbose",
+                    "--tries=1",
+                    "--spider",
+                    "http://backend:8080/api/health",
+                ]
             interval: 10s
             timeout: 5s
             retries: 5

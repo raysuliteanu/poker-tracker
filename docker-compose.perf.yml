@@ -5,7 +5,7 @@
 services:
     postgres:
         container_name: poker_tracker_perf_db
-        ports: []  # Remove port mapping for test isolation
+        ports: [] # Remove port mapping for test isolation
         environment:
             POSTGRES_DB: poker_tracker_perf_test
         volumes:
@@ -18,11 +18,11 @@ services:
 
     backend:
         container_name: poker_tracker_perf_backend
-        ports: []  # Remove port mapping for test isolation
+        ports: [] # Remove port mapping for test isolation
         environment:
             DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker_perf_test
             RUST_LOG: warn # Reduce logging noise during performance tests
-            BCRYPT_COST: 4 # Lower cost for faster performance testing
+            SECURITY_BCRYPTCOST: 4 # Lower cost for faster performance testing
 
     frontend:
         # We don't need the frontend for backend performance testing

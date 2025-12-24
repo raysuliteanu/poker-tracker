@@ -25,8 +25,8 @@ pub fn establish_connection_pool(db_config: &DatabaseConfig) -> DbPool {
     let manager = ConnectionManager::<PgConnection>::new(&db_config.url);
 
     r2d2::Pool::builder()
-        .max_size(db_config.max_connections)
-        .min_idle(Some(db_config.min_idle))
+        .max_size(db_config.maxconnections)
+        .min_idle(Some(db_config.minidle))
         .build(manager)
         .expect("Failed to create database connection pool")
 }
