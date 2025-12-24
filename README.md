@@ -109,11 +109,11 @@ cd backend
 
 # Option 1: Use TOML configuration (recommended)
 cp poker-tracker.toml.example poker-tracker.toml
-# Edit poker-tracker.toml and update database.url and security.jwtsecret
+# Edit poker-tracker.toml and update db_url and jwt_secret
 
 # Option 2: Use environment variables
 cp .env.example .env
-# Edit .env and update DATABASE_URL and SECURITY_JWTSECRET
+# Edit .env and update DB_URL and JWT_SECRET
 
 # Install diesel CLI (if not already installed)
 cargo install diesel_cli --no-default-features --features postgres
@@ -195,18 +195,13 @@ The backend supports multiple configuration methods with the following precedenc
 Create `backend/poker-tracker.toml` (see `poker-tracker.toml.example`):
 
 ```toml
-[server]
 host = "127.0.0.1"
 port = 8080
-
-[database]
-url = "postgres://postgres:password@localhost/poker_tracker"
-maxconnections = 100
-minidle = 10
-
-[security]
-jwtsecret = "your-secret-key-change-this-in-production"
-bcryptcost = 12  # 4-6 for tests, 12+ for production
+db_url = "postgres://postgres:password@localhost/poker_tracker"
+db_max_connections = 100
+db_min_idle = 10
+jwt_secret = "your-secret-key-change-this-in-production"
+bcrypt_cost = 12  # 4-6 for tests, 12+ for production
 ```
 
 ### Environment Variables
@@ -215,21 +210,21 @@ Environment variables override TOML values:
 
 ```sh
 # Required (no defaults)
-DATABASE_URL=postgres://postgres:password@localhost/poker_tracker
-SECURITY_JWTSECRET=your-secret-key-change-this-in-production
+DB_URL=postgres://postgres:password@localhost/poker_tracker
+JWT_SECRET=your-secret-key-change-this-in-production
 
 # Optional (have defaults)
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DATABASE_MAXCONNECTIONS=100
-DATABASE_MINIDLE=10
-SECURITY_BCRYPTCOST=12
+HOST=127.0.0.1
+PORT=8080
+DB_MAX_CONNECTIONS=100
+DB_MIN_IDLE=10
+BCRYPT_COST=12
 
 # Logging
 RUST_LOG=info
 ```
 
-**Production Recommendation:** Use TOML for non-sensitive configuration, environment variables for secrets (DATABASE_URL, SECURITY_JWTSECRET).
+**Production Recommendation:** Use TOML for non-sensitive configuration, environment variables for secrets (DB_URL, JWT_SECRET).
 
 ### Frontend (.env)
 
@@ -265,8 +260,8 @@ VITE_API_URL=http://localhost:8080/api
 
 ## Security Features
 
-- Password hashing with bcrypt (configurable cost via `security.bcryptcost`, default: 12)
-- JWT token authentication (7-day expiration, secret via `security.jwtsecret`)
+- Password hashing with bcrypt (configurable cost via `bcrypt_cost`, default: 12)
+- JWT token authentication (7-day expiration, secret via `jwt_secret`)
 - Centralized configuration with TOML + environment variable support
 - CORS configuration
 - SQL injection prevention via Diesel ORM
@@ -279,8 +274,8 @@ VITE_API_URL=http://localhost:8080/api
 ### Considerations
 
 1. **Configuration**: Use TOML for non-secret config, environment variables for secrets
-   - Never commit `SECURITY_JWTSECRET` or `DATABASE_URL` with real credentials to version control
-   - Use environment variables for `DATABASE_URL` and `SECURITY_JWTSECRET` in production
+   - Never commit `JWT_SECRET` or `DB_URL` with real credentials to version control
+   - Use environment variables for `DB_URL` and `JWT_SECRET` in production
    - Consider using `poker-tracker.toml` for server host/port and performance tuning
 2. **HTTPS**: Use a reverse proxy (nginx/traefik) with SSL certificates
 3. **Database**: Use managed PostgreSQL or secure your database server
@@ -416,7 +411,7 @@ and tearing down afterward.
 **Configuration:**
 
 - Each virtual user (VU) gets a unique test account to eliminate database contention
-- Backend uses `BCRYPTCOST=4` for faster authentication (configured in docker-compose.perf.yml)
+- Backend uses `BCRYPT_COST=4` for faster authentication (configured in docker-compose.perf.yml)
 - Connection pool sized for concurrent load
 - Pagination limits ensure consistent performance
 

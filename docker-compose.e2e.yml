@@ -18,12 +18,12 @@ services:
             dockerfile: Dockerfile
         container_name: poker_tracker_e2e_backend
         environment:
-            DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker
-            SECURITY_JWTSECRET: e2e-test-secret
-            SECURITY_BCRYPTCOST: 4
+            DB_URL: postgres://postgres:password@postgres:5432/poker_tracker
+            JWT_SECRET: e2e-test-secret
+            BCRYPT_COST: 4
             RUST_LOG: info
-            SERVER_HOST: 0.0.0.0
-            SERVER_PORT: 8080
+            HOST: 0.0.0.0
+            PORT: 8080
         depends_on:
             postgres:
                 condition: service_healthy

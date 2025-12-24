@@ -61,7 +61,7 @@ pub fn create_app_router(state: Arc<AppState>) -> Router {
         .allow_headers(Any)
         .max_age(std::time::Duration::from_secs(3600));
 
-    let jwt_secret = state.config.security.jwtsecret.clone();
+    let jwt_secret = state.config.jwt_secret.clone();
 
     Router::new()
         .route("/api/health", get(health))
@@ -101,14 +101,14 @@ impl PokerTrackerApp {
     }
 
     pub async fn run(self) -> std::io::Result<()> {
-        let pool = establish_connection_pool(&self.config.database);
+        let pool = establish_connection_pool(&self.config);
 
         // Run migrations
         let mut conn = pool.get().expect("Failed to get connection");
         conn.run_pending_migrations(MIGRATIONS)
             .expect("Failed to run migrations");
 
-        let bind_address = format!("{}:{}", self.config.server.host, self.config.server.port);
+        let bind_address = format!("{}:{}", self.config.host, self.config.port);
 
         tracing::info!("Starting server at http://{}", bind_address);
 

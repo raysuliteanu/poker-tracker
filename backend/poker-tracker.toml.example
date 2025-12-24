@@ -1,20 +1,20 @@
 # Poker Tracker Configuration
 # Copy to poker-tracker.toml and customize
 
-[server]
+# Server configuration
 host = "127.0.0.1"
 port = 8080
 
-[database]
+# Database configuration
 # Required: database connection URL
-url = "postgres://postgres:password@localhost/poker_tracker"
+db_url = "postgres://postgres:password@localhost/poker_tracker"
 # Optional: Connection pool configuration
-maxconnections = 100
-minidle = 10
+db_max_connections = 100
+db_min_idle = 10
 
-[security]
-# Required: JWT signing secret;
+# Security configuration
+# Required: JWT signing secret
 # NOTE: in production, recommended to set via environment!
-jwtsecret = "your-secret-key-change-this-in-production"
+jwt_secret = "your-secret-key-change-this-in-production"
 # Optional: bcrypt cost (4-6 for tests, 12+ for production)
-bcryptcost = 12
+bcrypt_cost = 12

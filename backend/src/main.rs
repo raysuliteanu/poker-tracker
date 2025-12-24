@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
         Err(e) => {
             eprintln!("Failed to load configuration: {}", e);
             eprintln!(
-                "Required: DATABASE_URL and SECURITY_JWTSECRET must be set via environment or in poker-tracker.toml"
+                "Required: DB_URL and JWT_SECRET must be set via environment or in poker-tracker.toml"
             );
             std::process::exit(1);
         }

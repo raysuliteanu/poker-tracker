@@ -7,10 +7,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use poker_tracker::models::user::{NewUser, User};
 use poker_tracker::models::{CreatePokerSessionRequest, PokerSession};
 use poker_tracker::schema::{poker_sessions, users};
-use poker_tracker::utils::{
-    DatabaseConfig, DbConnection, DbPool, DbProvider, PokerTrackerConfig, SecurityConfig,
-    ServerConfig,
-};
+use poker_tracker::utils::{DbConnection, DbPool, DbProvider, PokerTrackerConfig};
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
@@ -120,19 +117,13 @@ impl DbProvider for PooledConnectionTestDb {
 /// Helper to create a test config for unit and integration tests
 pub fn test_config() -> PokerTrackerConfig {
     PokerTrackerConfig {
-        server: ServerConfig {
-            host: "127.0.0.1".to_string(),
-            port: 8080,
-        },
-        database: DatabaseConfig {
-            url: "test_url".to_string(), // Will be overridden per test
-            max_connections: 10,
-            min_idle: 1,
-        },
-        security: SecurityConfig {
-            jwtsecret: "test_secret".to_string(),
-            bcryptcost: 4, // Fast for tests
-        },
+        host: "127.0.0.1".to_string(),
+        port: 8080,
+        db_url: "test_url".to_string(), // Will be overridden per test
+        db_max_connections: 10,
+        db_min_idle: 1,
+        jwt_secret: "test_secret".to_string(),
+        bcrypt_cost: 4, // Fast for tests
     }
 }
 

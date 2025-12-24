@@ -35,20 +35,14 @@ The application uses a centralized TOML-based configuration system via the `conf
 **Configuration Structure:**
 
 ```rust
-AppConfig {
-    server: ServerConfig {
-        host: String,      // Default: "127.0.0.1"
-        port: u16,         // Default: 8080
-    },
-    database: DatabaseConfig {
-        url: String,           // Required, no default
-        maxconnections: u32,   // Default: 100
-        minidle: u32,          // Default: 10
-    },
-    security: SecurityConfig {
-        jwtsecret: String,     // Required, no default
-        bcryptcost: u32,       // Default: 12
-    },
+PokerTrackerConfig {
+    host: String,              // Default: "127.0.0.1"
+    port: u16,                 // Default: 8080
+    db_url: String,            // Required, no default
+    db_max_connections: u32,   // Default: 100
+    db_min_idle: u32,          // Default: 10
+    jwt_secret: String,        // Required, no default
+    bcrypt_cost: u32,          // Default: 12
 }
 ```
 
@@ -56,34 +50,29 @@ AppConfig {
 
 1. **TOML File** (`poker-tracker.toml`, optional):
    ```toml
-   [server]
    host = "127.0.0.1"
    port = 8080
-
-   [database]
-   url = "postgres://..."
-   maxconnections = 100
-   minidle = 10
-
-   [security]
-   jwtsecret = "secret"
-   bcryptcost = 12
+   db_url = "postgres://..."
+   db_max_connections = 100
+   db_min_idle = 10
+   jwt_secret = "secret"
+   bcrypt_cost = 12
    ```
 
 2. **Environment Variables** (override TOML):
-   - `DATABASE_URL` → `database.url`
-   - `SECURITY_JWTSECRET` → `security.jwtsecret`
-   - `DATABASE_MAXCONNECTIONS` → `database.maxconnections`
-   - `DATABASE_MINIDLE` → `database.minidle`
-   - `SECURITY_BCRYPTCOST` → `security.bcryptcost`
-   - `SERVER_HOST` → `server.host`
-   - `SERVER_PORT` → `server.port`
+   - `DB_URL` → `db_url`
+   - `JWT_SECRET` → `jwt_secret`
+   - `DB_MAX_CONNECTIONS` → `db_max_connections`
+   - `DB_MIN_IDLE` → `db_min_idle`
+   - `BCRYPT_COST` → `bcrypt_cost`
+   - `HOST` → `host`
+   - `PORT` → `port`
 
 3. **Hardcoded Defaults** (used if not in TOML or env)
 
 **Required Fields:**
-- `DATABASE_URL`: PostgreSQL connection string
-- `SECURITY_JWTSECRET`: JWT signing secret
+- `DB_URL`: PostgreSQL connection string
+- `JWT_SECRET`: JWT signing secret
 
 If required fields are missing, the application exits with a clear error message.
 
@@ -174,9 +163,9 @@ pub async fn handler(Extension(user_id): Extension<Uuid>) -> Response {
 **Connection Pooling:** r2d2 with Diesel PostgreSQL backend
 
 **Configuration:**
-- `maxconnections` (default: 100) - Maximum pool size
-- `minidle` (default: 10) - Keeps connections warm for reduced latency
-- Both configurable via `DatabaseConfig` in `AppConfig`
+- `db_max_connections` (default: 100) - Maximum pool size
+- `db_min_idle` (default: 10) - Keeps connections warm for reduced latency
+- Both configurable via `PokerTrackerConfig`
 
 **DbProvider Trait:** Single trait abstraction for database connections:
 - Production: `DbPool` implements `DbProvider` with pooled connections
@@ -542,18 +531,18 @@ The backend includes several configurable parameters for optimization, all confi
 
 ### Database Connection Pool
 
-- `database.maxconnections` (default: 100) - Maximum number of pooled connections
-- `database.minidle` (default: 10) - Keeps connections warm to reduce latency
+- `db_max_connections` (default: 100) - Maximum number of pooled connections
+- `db_min_idle` (default: 10) - Keeps connections warm to reduce latency
 - Connection timeout: 5 seconds
-- Configure via `DATABASE_MAXCONNECTIONS` and `DATABASE_MINIDLE` env vars or TOML
+- Configure via `DB_MAX_CONNECTIONS` and `DB_MIN_IDLE` env vars or TOML
 
 ### Bcrypt Hashing Cost
 
-- `security.bcryptcost` (default: 12) - Password hashing cost factor
+- `bcrypt_cost` (default: 12) - Password hashing cost factor
 - Production: 12 (secure, ~250ms per hash)
 - Load testing: 4 (fast, ~15ms per hash, configured in docker-compose.perf.yml)
 - Trade-off: Lower cost = faster authentication but less security
-- Configure via `SECURITY_BCRYPTCOST` env var or TOML
+- Configure via `BCRYPT_COST` env var or TOML
 
 ### Tokio Runtime
 
@@ -572,23 +561,23 @@ The k6 load tests can be customized:
 - `./run-perf-tests.sh` - Default 100 virtual users
 - `./run-perf-tests.sh 500` - Custom VU count
 - Each VU uses unique user to eliminate database contention
-- Tests use BCRYPTCOST=4 automatically for realistic load simulation
+- Tests use BCRYPT_COST=4 automatically for realistic load simulation
 
 ## Security Considerations
 
-- Passwords hashed with bcrypt (configurable cost via `security.bcryptcost`)
-- JWT tokens expire after 7 days (secret configured via `security.jwtsecret`)
+- Passwords hashed with bcrypt (configurable cost via `bcrypt_cost`)
+- JWT tokens expire after 7 days (secret configured via `jwt_secret`)
 - CORS configured (currently allows any origin - restrict for production)
 - Auth middleware validates all protected routes
 - SQL injection prevented by Diesel's parameterized queries
 - XSS mitigated by Svelte's automatic escaping
-- Configuration system supports environment-only secrets (don't commit JWTSECRET to TOML in production)
+- Configuration system supports environment-only secrets (don't commit JWT_SECRET to TOML in production)
 
 ## Production Deployment Notes
 
 1. Update CORS configuration in `main.rs` to restrict origins
-2. Set strong `SECURITY_JWTSECRET` environment variable (never commit to version control)
-3. Use proper PostgreSQL credentials via `DATABASE_URL` environment variable
+2. Set strong `JWT_SECRET` environment variable (never commit to version control)
+3. Use proper PostgreSQL credentials via `DB_URL` environment variable
 4. Consider using TOML for non-secret config, environment variables for secrets
 5. Consider adding rate limiting
 5. Enable HTTPS via reverse proxy or load balancer

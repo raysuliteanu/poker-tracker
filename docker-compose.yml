@@ -22,11 +22,11 @@ services:
             dockerfile: Dockerfile
         container_name: poker_tracker_backend
         environment:
-            DATABASE_URL: postgres://postgres:password@postgres:5432/poker_tracker
-            SECURITY_JWTSECRET: change-this-secret-in-production
+            DB_URL: postgres://postgres:password@postgres:5432/poker_tracker
+            JWT_SECRET: change-this-secret-in-production
             RUST_LOG: debug
-            SERVER_HOST: 0.0.0.0
-            SERVER_PORT: 8080
+            HOST: 0.0.0.0
+            PORT: 8080
         ports:
             - "8080:8080" # Keep port mapping for dev environment
         depends_on:

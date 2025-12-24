@@ -124,7 +124,7 @@ pub async fn register(
 
     let user = match do_register(
         state.db_provider.as_ref(),
-        state.config.security.bcryptcost,
+        state.config.bcrypt_cost,
         req.email,
         req.username,
         req.password,
@@ -177,7 +177,7 @@ pub async fn register(
         }
     };
 
-    let token = match create_jwt(user.id, &state.config.security.jwtsecret) {
+    let token = match create_jwt(user.id, &state.config.jwt_secret) {
         Ok(t) => t,
         Err(_) => {
             return (
@@ -227,7 +227,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequ
         }
     };
 
-    let token = match create_jwt(user.id, &state.config.security.jwtsecret) {
+    let token = match create_jwt(user.id, &state.config.jwt_secret) {
         Ok(t) => t,
         Err(_) => {
             return (
@@ -367,7 +367,7 @@ pub async fn change_password(
             .into_response();
     }
 
-    let new_password_hash = match hash(&passwords.new_password, state.config.security.bcryptcost) {
+    let new_password_hash = match hash(&passwords.new_password, state.config.bcrypt_cost) {
         Ok(h) => h,
         Err(_) => {
             return (
