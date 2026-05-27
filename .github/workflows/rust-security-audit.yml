@@ -40,8 +40,24 @@ jobs:
               continue-on-error: true
               run: cargo audit --ignore RUSTSEC-2025-0134
 
-            - name: Create fix branch and run cargo update
+            - name: Check for existing fix PR
               if: steps.initial_audit.outcome == 'failure'
+              id: check_existing_pr
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                PR_NUMBER=$(gh pr list \
+                  --search "auto-fix cargo audit in:title" \
+                  --state open \
+                  --json number \
+                  --jq '.[0].number')
+                if [ -n "$PR_NUMBER" ]; then
+                  echo "::notice::Fix PR #$PR_NUMBER is already open and pending merge. Skipping duplicate."
+                  echo "existing_pr=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+                fi
+
+            - name: Create fix branch and run cargo update
+              if: steps.initial_audit.outcome == 'failure' && steps.check_existing_pr.outputs.existing_pr == ''
               id: create_fix
               run: |
                 BRANCH="chore/auto-fix-cargo-audit-$(date +%Y%m%d)"
@@ -52,14 +68,14 @@ jobs:
                 cd backend && cargo update
 
             - name: Re-run cargo audit after update
-              if: steps.initial_audit.outcome == 'failure'
+              if: steps.initial_audit.outcome == 'failure' && steps.check_existing_pr.outputs.existing_pr == ''
               id: reaudit
               working-directory: backend
               continue-on-error: true
               run: cargo audit --ignore RUSTSEC-2025-0134
 
-            - name: Commit, push, and open PR
-              if: steps.initial_audit.outcome == 'failure' && steps.reaudit.outcome == 'success'
+            - name: Commit, push, open PR, and enable auto-merge
+              if: steps.initial_audit.outcome == 'failure' && steps.check_existing_pr.outputs.existing_pr == '' && steps.reaudit.outcome == 'success'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
@@ -67,14 +83,15 @@ jobs:
                 git add backend/Cargo.lock
                 git commit -m "chore: cargo update to fix cargo audit findings"
                 git push origin "$BRANCH"
-                gh pr create \
+                PR_URL=$(gh pr create \
                   --title "chore: auto-fix cargo audit via cargo update" \
-                  --body "Automated PR: \`cargo update\` resolved all \`cargo audit\` findings. Please review and merge." \
+                  --body "Automated PR: \`cargo update\` resolved all \`cargo audit\` findings." \
                   --base main \
-                  --head "$BRANCH"
+                  --head "$BRANCH")
+                gh pr merge --auto --merge "$PR_URL"
 
             - name: Fail workflow (audit could not be auto-fixed)
-              if: steps.initial_audit.outcome == 'failure' && steps.reaudit.outcome == 'failure'
+              if: steps.initial_audit.outcome == 'failure' && steps.check_existing_pr.outputs.existing_pr == '' && steps.reaudit.outcome == 'failure'
               run: |
                 echo "::error::cargo audit failed and cargo update did not resolve it. Manual intervention required."
                 exit 1
