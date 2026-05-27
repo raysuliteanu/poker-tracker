@@ -21,16 +21,60 @@ jobs:
     audit:
         name: Security audit
         runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
 
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install cargo-audit
+              run: cargo install cargo-audit --locked
+
             - name: Run cargo audit
-              uses: rustsec/audit-check@v2.0.0
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  working-directory: backend
-                  # Ignore RUSTSEC-2025-0134: rustls-pemfile unmaintained warning
-                  # This is a dev-dependency via testcontainers->bollard
-                  # Waiting for bollard to migrate to rustls-pki-types
-                  ignore: RUSTSEC-2025-0134
+              id: initial_audit
+              working-directory: backend
+              continue-on-error: true
+              run: cargo audit --ignore RUSTSEC-2025-0134
+
+            - name: Create fix branch and run cargo update
+              if: steps.initial_audit.outcome == 'failure'
+              id: create_fix
+              run: |
+                BRANCH="chore/auto-fix-cargo-audit-$(date +%Y%m%d)"
+                echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+                git config user.name "github-actions[bot]"
+                git config user.email "github-actions[bot]@users.noreply.github.com"
+                git checkout -b "$BRANCH"
+                cd backend && cargo update
+
+            - name: Re-run cargo audit after update
+              if: steps.initial_audit.outcome == 'failure'
+              id: reaudit
+              working-directory: backend
+              continue-on-error: true
+              run: cargo audit --ignore RUSTSEC-2025-0134
+
+            - name: Commit, push, and open PR
+              if: steps.initial_audit.outcome == 'failure' && steps.reaudit.outcome == 'success'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                BRANCH="${{ steps.create_fix.outputs.branch }}"
+                git add backend/Cargo.lock
+                git commit -m "chore: cargo update to fix cargo audit findings"
+                git push origin "$BRANCH"
+                gh pr create \
+                  --title "chore: auto-fix cargo audit via cargo update" \
+                  --body "Automated PR: \`cargo update\` resolved all \`cargo audit\` findings. Please review and merge." \
+                  --base main \
+                  --head "$BRANCH"
+
+            - name: Fail workflow (audit could not be auto-fixed)
+              if: steps.initial_audit.outcome == 'failure' && steps.reaudit.outcome == 'failure'
+              run: |
+                echo "::error::cargo audit failed and cargo update did not resolve it. Manual intervention required."
+                exit 1
